@@ -6,7 +6,7 @@ WIP
 `pip install -e .`
 
 ### Production
-`pip install -e .`
+`pip install .`
 
 ## Distribution
 `python -m build`
