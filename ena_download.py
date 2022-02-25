@@ -81,6 +81,7 @@ def wget(url, filename, tries=0):
     except URLError as err:
         if tries <= INITIAL_RETRIES:
             sleeptime = 2 ** tries
+            # TODO add url and/or filename for identification
             logging.warning(f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds...")
             sleep(sleeptime)
             wget(url, filename, tries + 1)
