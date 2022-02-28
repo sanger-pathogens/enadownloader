@@ -295,13 +295,13 @@ def arg_parser():
 
 
 def validate_dir(path: str):
-    path = Path(path)
-    if path.is_dir():
-        return path
-    else:
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as err:
         raise argparse.ArgumentTypeError(
-            f"invalid path to dir (path does not exist or is not a directory): {path}"
+            f"cannot create dir: {err}"
         )
+    return Path(path).resolve()
 
 
 def validate_threads(threads: str):
