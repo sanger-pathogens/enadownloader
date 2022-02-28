@@ -13,7 +13,7 @@ workflow:
 
 stages:
   - format
-#  - test
+  - test
   - build
   - tag_on_merges
 
@@ -37,18 +37,18 @@ Check Black format:
     - pip install black
     - black . --check --diff --color
 
-Pytest:
-  stage: test
-  only:
-    - branches
-  except:
-    - tags
-  <<: *start_docker
-  script:
-    - TAG="commit-${CI_COMMIT_SHORT_SHA}"
-    - docker build --no-cache -t "${CI_REGISTRY_IMAGE}:${TAG}" .
-    - docker run "${CI_REGISTRY_IMAGE}:${TAG}" pytest --cov ena_download.py --cov-branch --cov-report term-missing --cov-fail-under 60
-  coverage: /^.*TOTAL.+?(\d+\%)$/
+#Pytest:
+#  stage: test
+#  only:
+#    - branches
+#  except:
+#    - tags
+#  <<: *start_docker
+#  script:
+#    - TAG="commit-${CI_COMMIT_SHORT_SHA}"
+#    - docker build --no-cache -t "${CI_REGISTRY_IMAGE}:${TAG}" .
+#    - docker run "${CI_REGISTRY_IMAGE}:${TAG}" pytest --cov ena_download.py --cov-branch --cov-report term-missing --cov-fail-under 60
+#  coverage: /^.*TOTAL.+?(\d+\%)$/
 
 
 # at every git push, build docker image and push to the container registry with the commit SHA-1 as the tag
