@@ -17,16 +17,18 @@ import requests
 
 INITIAL_RETRIES = 5
 
+
 class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
-    def __init__(self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False):
+    def __init__(
+        self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
+    ):
         self.run_accession = run_accession
         self.ftp = ftp
         self.md5 = md5
         self.md5_passed = md5_passed
         self.key = splitext(basename(ftp))[0]
-
 
     @property
     def md5_passed(self):
@@ -34,7 +36,9 @@ class ENAObject:
 
     @md5_passed.setter
     def md5_passed(self, value):
-        self._md5_passed = bool(strtobool(value)) if not isinstance(value, bool) else value
+        self._md5_passed = (
+            bool(strtobool(value)) if not isinstance(value, bool) else value
+        )
 
     @md5_passed.getter
     def md5_passed(self):
@@ -80,9 +84,11 @@ def wget(url, filename, tries=0):
             shutil.copyfileobj(response, out_file)
     except URLError as err:
         if tries <= INITIAL_RETRIES:
-            sleeptime = 2 ** tries
+            sleeptime = 2**tries
             # TODO add url and/or filename for identification
-            logging.warning(f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds...")
+            logging.warning(
+                f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds..."
+            )
             sleep(sleeptime)
             wget(url, filename, tries + 1)
         else:
@@ -137,7 +143,9 @@ def read_response_file(response_file):
                 try:
                     response_parsed[obj.key].md5_passed = line[-1]
                 except KeyError:
-                    logging.warning(f"{obj.key} key has gone missing from {progress_file}!")
+                    logging.warning(
+                        f"{obj.key} key has gone missing from {progress_file}!"
+                    )
 
     return response_parsed
 
@@ -158,8 +166,9 @@ def listener(accession, queue: mp.Queue):
     with open(response_file, "a") as f:
         while True:
             m = queue.get()
-            assert isinstance(m,
-                              (str, ENAObject)), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
+            assert isinstance(
+                m, (str, ENAObject)
+            ), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
             if m == "kill":
                 queue.task_done()
                 break
