@@ -211,7 +211,7 @@ def get_files(accession):
 def download_project_fastqs(accession, threads, output_dir):
     response = get_files(accession)
 
-    number_of_threads = int(os.getenv("THREADS", threads))
+    number_of_threads = int(threads)
     manager = mp.Manager()
     queue = manager.Queue()
     with mp.Pool(processes=number_of_threads) as pool:
@@ -251,7 +251,7 @@ def download_fastqs(ena: ENAObject, q, output_dir: Path):
 
 def arg_parser():
     parser = argparse.ArgumentParser(
-        description="Robust tool to download fastq.gz files and metadata from ENA",
+        description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -279,9 +279,18 @@ def arg_parser():
         "--verbosity",
         action="count",
         default=0,
-        help="Increase output verbosity (use the option multiple times, or specify verbosity level as an integer)"
+        help="Use the option multiple times to increase output verbosity"
     )
     args = parser.parse_args()
+
+    # Set log_level arg
+    if args.verbosity >= 2:
+        args.log_level = logging.DEBUG
+    elif args.verbosity >= 1:
+        args.log_level = logging.INFO
+    else:
+        args.log_level = logging.WARN
+
     return args
 
 
@@ -310,27 +319,18 @@ def validate_threads(threads: str):
 
 if __name__ == "__main__":
     args = arg_parser()
-
-    if args.verbosity >= 2:
-        log_level = logging.DEBUG
-    elif args.verbosity >= 1:
-        log_level = logging.INFO
-    else:
-        log_level = logging.WARN
-
     # Set up logging
     fh = logging.FileHandler(f"{splitext(__file__)[0]}.log", mode="w")
     fh.setLevel(logging.DEBUG)
     sh = logging.StreamHandler()
     # noinspection PyArgumentList
     logging.basicConfig(
-        level=log_level,
+        level=args.log_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[fh, sh],
     )
 
-    logging.info("start")
     download_project_fastqs(
         accession=args.project, threads=args.threads, output_dir=args.output_dir
     )
