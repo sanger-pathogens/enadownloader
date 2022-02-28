@@ -1,4 +1,4 @@
-FROM python:3.9 AS compile-image
+FROM python:3.10 AS compile-image
 
 RUN python -m venv /opt/venv
 # Make sure we use the virtualenv:
@@ -8,7 +8,7 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 
-FROM python:3.9-alpine AS runner
+FROM python:3.10-alpine AS runner
 
 WORKDIR /opt
 
