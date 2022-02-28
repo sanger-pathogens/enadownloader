@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 """
-Set THREADS to number of threads needed, default 20
+Robust tool to download fastq.gz files and metadata from ENA
 """
 
+import argparse
 import hashlib
 import logging
 import multiprocessing as mp
@@ -12,21 +14,24 @@ from distutils.util import strtobool
 from os.path import basename, exists, splitext
 from time import sleep
 from urllib.error import URLError
+from pathlib import Path
 
 import requests
 
 INITIAL_RETRIES = 5
 
+
 class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
-    def __init__(self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False):
+    def __init__(
+        self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
+    ):
         self.run_accession = run_accession
         self.ftp = ftp
         self.md5 = md5
         self.md5_passed = md5_passed
         self.key = splitext(basename(ftp))[0]
-
 
     @property
     def md5_passed(self):
@@ -34,7 +39,9 @@ class ENAObject:
 
     @md5_passed.setter
     def md5_passed(self, value):
-        self._md5_passed = bool(strtobool(value)) if not isinstance(value, bool) else value
+        self._md5_passed = (
+            bool(strtobool(value)) if not isinstance(value, bool) else value
+        )
 
     @md5_passed.getter
     def md5_passed(self):
@@ -73,7 +80,8 @@ class ENAObject:
 
 
 def wget(url, filename, tries=0):
-    print(f"Downloading {filename}")
+    # TODO This doesn't work
+    logging.info(f"Downloading {filename}")
 
     try:
         with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -81,7 +89,10 @@ def wget(url, filename, tries=0):
     except URLError as err:
         if tries <= INITIAL_RETRIES:
             sleeptime = 2 ** tries
-            logging.warning(f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds...")
+            # TODO This doesn't work
+            logging.warning(
+                f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds..."
+            )
             sleep(sleeptime)
             wget(url, filename, tries + 1)
         else:
@@ -136,7 +147,9 @@ def read_response_file(response_file):
                 try:
                     response_parsed[obj.key].md5_passed = line[-1]
                 except KeyError:
-                    logging.warning(f"{obj.key} key has gone missing from {progress_file}!")
+                    logging.warning(
+                        f"{obj.key} key has gone missing from {progress_file}!"
+                    )
 
     return response_parsed
 
@@ -157,8 +170,9 @@ def listener(accession, queue: mp.Queue):
     with open(response_file, "a") as f:
         while True:
             m = queue.get()
-            assert isinstance(m,
-                              (str, ENAObject)), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
+            assert isinstance(
+                m, (str, ENAObject)
+            ), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
             if m == "kill":
                 queue.task_done()
                 break
@@ -194,10 +208,10 @@ def get_files(accession):
     return response_parsed
 
 
-def download_project_fastqs(accession):
+def download_project_fastqs(accession, threads, output_dir):
     response = get_files(accession)
 
-    number_of_threads = int(os.getenv("THREADS", 20))
+    number_of_threads = int(os.getenv("THREADS", threads))
     manager = mp.Manager()
     queue = manager.Queue()
     with mp.Pool(processes=number_of_threads) as pool:
@@ -205,7 +219,11 @@ def download_project_fastqs(accession):
 
         res = pool.starmap_async(
             download_fastqs,
-            [(item, queue) for item in response.values() if not item.md5_passed],
+            [
+                (item, queue, output_dir)
+                for item in response.values()
+                if not item.md5_passed
+            ],
         )
         res.get()
 
@@ -221,9 +239,9 @@ def md5_check(fname):
     return hash_md5.hexdigest()
 
 
-def download_fastqs(ena: ENAObject, q):
+def download_fastqs(ena: ENAObject, q, output_dir: Path):
     url = "ftp://" + ena.ftp
-    outfile = basename(ena.ftp)
+    outfile = output_dir / basename(ena.ftp)
     wget(url, outfile)
     md5_f = md5_check(outfile)
 
@@ -231,13 +249,88 @@ def download_fastqs(ena: ENAObject, q):
     q.put(ena)
 
 
+def arg_parser():
+    parser = argparse.ArgumentParser(
+        description="Robust tool to download fastq.gz files and metadata from ENA",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-p",
+        "--project",
+        required=True,
+        help="ENA project identifier",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_dir",
+        default=os.getcwd(),
+        type=validate_dir,
+        help="directory in which to save downloaded files",
+    )
+    parser.add_argument(
+        "-t",
+        "--threads",
+        default=1,
+        type=validate_threads,
+        help="Number of threads to use for download",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="Increase output verbosity (use the option multiple times, or specify verbosity level as an integer)"
+    )
+    args = parser.parse_args()
+    return args
+
+
+def validate_dir(path: str):
+    path = Path(path)
+    if path.is_dir():
+        return path
+    else:
+        raise argparse.ArgumentTypeError(
+            f"invalid path to dir (path does not exist or is not a directory): {path}"
+        )
+
+
+def validate_threads(threads: str):
+    try:
+        threads = int(threads)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {threads!r}")
+    if 1 < threads <= 100:
+        return threads
+    else:
+        raise argparse.ArgumentTypeError(
+            f"invalid int value (must be between 2 and 100): {threads!r}"
+        )
+
+
 if __name__ == "__main__":
+    args = arg_parser()
+
+    if args.verbosity >= 2:
+        log_level = logging.DEBUG
+    elif args.verbosity >= 1:
+        log_level = logging.INFO
+    else:
+        log_level = logging.WARN
+
+    # Set up logging
+    fh = logging.FileHandler(f"{splitext(__file__)[0]}.log", mode="w")
+    fh.setLevel(logging.DEBUG)
+    sh = logging.StreamHandler()
+    # noinspection PyArgumentList
     logging.basicConfig(
-        filename=f"{__file__}.log",
-        filemode="w",
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)s %(message)s",
+        level=log_level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[fh, sh],
     )
 
     logging.info("start")
-    download_project_fastqs("PRJNA797994")
+    download_project_fastqs(
+        accession=args.project, threads=args.threads, output_dir=args.output_dir
+    )
