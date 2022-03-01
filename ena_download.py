@@ -87,7 +87,7 @@ def wget(url, filename, tries=0):
             shutil.copyfileobj(response, out_file)
     except URLError as err:
         if tries <= INITIAL_RETRIES:
-            sleeptime = 2 ** tries
+            sleeptime = 2**tries
             print(
                 f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds..."
             )
@@ -277,7 +277,7 @@ def arg_parser():
         "--verbosity",
         action="count",
         default=0,
-        help="Use the option multiple times to increase output verbosity"
+        help="Use the option multiple times to increase output verbosity",
     )
     args = parser.parse_args()
 
@@ -296,9 +296,7 @@ def validate_dir(path: str):
     try:
         os.makedirs(path, exist_ok=True)
     except OSError as err:
-        raise argparse.ArgumentTypeError(
-            f"cannot create dir: {err}"
-        )
+        raise argparse.ArgumentTypeError(f"cannot create dir: {err}")
     return Path(path).resolve()
 
 
