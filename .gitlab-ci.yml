@@ -26,6 +26,10 @@ stages:
 
 .build_and_push: &build_and_push
   before_script:
+    - echo "${CI_COMMIT_REF_NAME}"
+    - echo "${CI_COMMIT_BRANCH}"
+    - echo "${CI_COMMIT_TAG}"
+    - exit 1
     - echo "🐳 Building ${IMAGE} 🐳"
     - docker build --no-cache -t "${IMAGE}" --target runner .
     - echo "🐳 Pushing ${IMAGE} 🐳"
