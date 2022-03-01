@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 """
-Set THREADS to number of threads needed, default 20
+Robust tool to download fastq.gz files and metadata from ENA
 """
 
+import argparse
 import hashlib
 import logging
 import multiprocessing as mp
@@ -12,6 +14,7 @@ from distutils.util import strtobool
 from os.path import basename, exists, splitext
 from time import sleep
 from urllib.error import URLError
+from pathlib import Path
 
 import requests
 
@@ -84,9 +87,8 @@ def wget(url, filename, tries=0):
             shutil.copyfileobj(response, out_file)
     except URLError as err:
         if tries <= INITIAL_RETRIES:
-            sleeptime = 2**tries
-            # TODO add url and/or filename for identification
-            logging.warning(
+            sleeptime = 2 ** tries
+            print(
                 f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds..."
             )
             sleep(sleeptime)
@@ -204,25 +206,6 @@ def get_files(accession):
     return response_parsed
 
 
-def download_project_fastqs(accession):
-    response = get_files(accession)
-
-    number_of_threads = int(os.getenv("THREADS", 20))
-    manager = mp.Manager()
-    queue = manager.Queue()
-    with mp.Pool(processes=number_of_threads) as pool:
-        pool.apply_async(listener, (accession, queue))
-
-        res = pool.starmap_async(
-            download_fastqs,
-            [(item, queue) for item in response.values() if not item.md5_passed],
-        )
-        res.get()
-
-        queue.put("kill")
-        queue.join()
-
-
 def md5_check(fname):
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as f:
@@ -231,9 +214,9 @@ def md5_check(fname):
     return hash_md5.hexdigest()
 
 
-def download_fastqs(ena: ENAObject, q):
+def download_fastqs(ena: ENAObject, q, output_dir: Path):
     url = "ftp://" + ena.ftp
-    outfile = basename(ena.ftp)
+    outfile = output_dir / basename(ena.ftp)
     wget(url, outfile)
     md5_f = md5_check(outfile)
 
@@ -241,13 +224,111 @@ def download_fastqs(ena: ENAObject, q):
     q.put(ena)
 
 
+def download_project_fastqs(accession, threads, output_dir):
+    response = get_files(accession)
+
+    number_of_threads = int(threads)
+    manager = mp.Manager()
+    queue = manager.Queue()
+    with mp.Pool(processes=number_of_threads) as pool:
+        pool.apply_async(listener, (accession, queue))
+
+        res = pool.starmap_async(
+            download_fastqs,
+            [
+                (item, queue, output_dir)
+                for item in response.values()
+                if not item.md5_passed
+            ],
+        )
+        res.get()
+
+        queue.put("kill")
+        queue.join()
+
+
+def arg_parser():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-p",
+        "--project",
+        required=True,
+        help="ENA project identifier",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_dir",
+        default=os.getcwd(),
+        type=validate_dir,
+        help="directory in which to save downloaded files",
+    )
+    parser.add_argument(
+        "-t",
+        "--threads",
+        default=1,
+        type=validate_threads,
+        help="Number of threads to use for download",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="Use the option multiple times to increase output verbosity"
+    )
+    args = parser.parse_args()
+
+    # Set log_level arg
+    if args.verbosity >= 2:
+        args.log_level = logging.DEBUG
+    elif args.verbosity >= 1:
+        args.log_level = logging.INFO
+    else:
+        args.log_level = logging.WARN
+
+    return args
+
+
+def validate_dir(path: str):
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as err:
+        raise argparse.ArgumentTypeError(
+            f"cannot create dir: {err}"
+        )
+    return Path(path).resolve()
+
+
+def validate_threads(threads: str):
+    try:
+        threads = int(threads)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {threads!r}")
+    if 1 < threads <= 100:
+        return threads
+    else:
+        raise argparse.ArgumentTypeError(
+            f"invalid int value (must be between 2 and 100): {threads!r}"
+        )
+
+
 if __name__ == "__main__":
+    args = arg_parser()
+    # Set up logging
+    fh = logging.FileHandler(f"{splitext(__file__)[0]}.log", mode="w")
+    fh.setLevel(logging.DEBUG)
+    sh = logging.StreamHandler()
+    # noinspection PyArgumentList
     logging.basicConfig(
-        filename=f"{__file__}.log",
-        filemode="w",
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)s %(message)s",
+        level=args.log_level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[fh, sh],
     )
 
-    logging.info("start")
-    download_project_fastqs("PRJNA797994")
+    download_project_fastqs(
+        accession=args.project, threads=args.threads, output_dir=args.output_dir
+    )
