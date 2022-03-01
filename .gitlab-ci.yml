@@ -54,17 +54,15 @@ Branch builds:
   <<: *start_docker
   script:
     - *build_and_push
-    - docker images # -f reference=${CI_REGISTRY_IMAGE} -f before=${IMAGE}
 
-#Tag builds:
-#  stage: build
-#  variables:
-#    TAG: "${CI_COMMIT_TAG}-${CI_COMMIT_SHORT_SHA}"
-#  only:
-#    - tags
-#  except:
-#    - branches
-#  <<: *start_docker
-#  <<: *build_and_push
-#  after_script:
-#    - docker images -f reference=${CI_REGISTRY_IMAGE} -f before=${IMAGE}
+Tag builds:
+  stage: build
+  variables:
+    TAG: "${CI_COMMIT_TAG}-${CI_COMMIT_SHORT_SHA}"
+  only:
+    - tags
+  except:
+    - branches
+  <<: *start_docker
+  script:
+    - *build_and_push
