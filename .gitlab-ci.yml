@@ -2,9 +2,6 @@ default:
   tags:
     - autoscale
 
-variables:
-  TAG: commit-${CI_COMMIT_SHORT_SHA}
-
 workflow:
   rules:
     - if: $CI_COMMIT_TAG
@@ -19,13 +16,20 @@ stages:
 
 # this fragment starts the Docker daemon inside the CI-launched
 # container
-.job_template: &start_docker
+.start_docker: &start_docker
   before_script:
     - mkdir -p /etc/docker
     - echo '{"registry-mirrors":["https://docker-hub-mirror.internal.sanger.ac.uk:5000"],"default-address-pools":[{"base":"192.168.4.0/16","size":24}]}' > /etc/docker/daemon.json
     - dockerd > /var/log/dockerd.log 2>&1 &
     - sleep 10
     - echo -n ${CI_JOB_TOKEN} | docker login -u gitlab-ci-token --password-stdin ${CI_REGISTRY}
+
+.build_and_push: &build_and_push
+  before_script:
+    - echo "🐳 Building ${IMAGE} 🐳"
+    - docker build --no-cache -t "${IMAGE}" --target runner .
+    - echo "🐳 Pushing ${IMAGE} 🐳"
+    - docker push ${IMAGE}
 
 Check Black format:
   stage: format
@@ -37,30 +41,31 @@ Check Black format:
     - pip install black
     - black . --check --diff --color
 
-#Pytest:
-#  stage: test
-#  only:
-#    - branches
-#  except:
-#    - tags
-#  <<: *start_docker
-#  script:
-#    - TAG="commit-${CI_COMMIT_SHORT_SHA}"
-#    - docker build --no-cache -t "${CI_REGISTRY_IMAGE}:${TAG}" .
-#    - docker run "${CI_REGISTRY_IMAGE}:${TAG}" pytest --cov ena_download.py --cov-branch --cov-report term-missing --cov-fail-under 60
-#  coverage: /^.*TOTAL.+?(\d+\%)$/
-
-
 # at every git push, build docker image and push to the container registry with the commit SHA-1 as the tag
-Docker builds:
+Branch builds:
   stage: build
+  variables:
+    TAG: "${CI_COMMIT_BRANCH}-${CI_COMMIT_SHORT_SHA}"
+    IMAGE: "${CI_REGISTRY_IMAGE}:${TAG}"
   only:
     - branches
   except:
     - tags
   <<: *start_docker
+  <<: *build_and_push
   script:
-    - echo "🐳 Building ${CI_REGISTRY_IMAGE}:${TAG} 🐳"
-    - docker build --no-cache -t "${CI_REGISTRY_IMAGE}:${TAG}" --target runner .
-    - echo "🐳 Pushing ${CI_REGISTRY_IMAGE}:${TAG} 🐳"
-    - docker push ${CI_REGISTRY_IMAGE}:${TAG}
+    - docker images -f reference=${CI_REGISTRY_IMAGE} -f before=${IMAGE}
+
+Tag builds:
+  stage: build
+  variables:
+    TAG: "${CI_COMMIT_TAG}-${CI_COMMIT_SHORT_SHA}"
+    IMAGE: "${CI_REGISTRY_IMAGE}:${TAG}"
+  only:
+    - tags
+  except:
+    - branches
+  <<: *start_docker
+  <<: *build_and_push
+  script:
+    - docker images -f reference=${CI_REGISTRY_IMAGE} -f before=${IMAGE}
