@@ -17,9 +17,8 @@ COPY --from=compile-image /opt/venv /opt/venv
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY ena_download.py .
-
-ENTRYPOINT ["python", "ena_download.py"]
+COPY ena_download.py ./ena_download.py
+ENV PATH="$(pwd)/ena_download.py:$PATH"
 
 FROM runner AS test
 COPY tests tests
