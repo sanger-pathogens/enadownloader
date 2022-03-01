@@ -18,7 +18,9 @@ COPY --from=compile-image /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY ena_download.py ./ena_download.py
-ENV PATH="$(pwd)/ena_download.py:$PATH"
+RUN chmod +x ./ena_download.py
+
+ENV PATH="/opt/ena_download.py:$PATH"
 
 FROM runner AS test
 COPY tests tests
