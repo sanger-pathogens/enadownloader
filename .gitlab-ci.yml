@@ -25,13 +25,12 @@ stages:
     - echo -n ${CI_JOB_TOKEN} | docker login -u gitlab-ci-token --password-stdin ${CI_REGISTRY}
 
 .build_and_push: &build_and_push
-  script:
-    - export TAG=$(echo ${TAG} | sed s';/;_;g')
-    - export IMAGE="${CI_REGISTRY_IMAGE}:${TAG}"
-    - echo "🐳 Building ${IMAGE} 🐳"
-    - docker build --no-cache -t "${IMAGE}" --target runner .
-    - echo "🐳 Pushing ${IMAGE} 🐳"
-    - docker push ${IMAGE}
+  - export TAG=$(echo ${TAG} | sed s';/;_;g')
+  - export IMAGE="${CI_REGISTRY_IMAGE}:${TAG}"
+  - echo "🐳 Building ${IMAGE} 🐳"
+  - docker build --no-cache -t "${IMAGE}" --target runner .
+  - echo "🐳 Pushing ${IMAGE} 🐳"
+  - docker push ${IMAGE}
 
 #Check Black format:
 #  stage: format
@@ -53,8 +52,8 @@ Branch builds:
   except:
     - tags
   <<: *start_docker
-  <<: *build_and_push
-  after_script:
+  script:
+    - *build_and_push
     - docker images -f reference=${CI_REGISTRY_IMAGE} -f before=${IMAGE}
 
 #Tag builds:
