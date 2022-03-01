@@ -80,8 +80,7 @@ class ENAObject:
 
 
 def wget(url, filename, tries=0):
-    # TODO This doesn't work
-    logging.info(f"Downloading {filename}")
+    print(f"Downloading {filename}")
 
     try:
         with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -89,8 +88,7 @@ def wget(url, filename, tries=0):
     except URLError as err:
         if tries <= INITIAL_RETRIES:
             sleeptime = 2 ** tries
-            # TODO This doesn't work
-            logging.warning(
+            print(
                 f"{err.errno}: {str(err)} - Download failed, retrying after {sleeptime} seconds..."
             )
             sleep(sleeptime)
@@ -208,6 +206,24 @@ def get_files(accession):
     return response_parsed
 
 
+def md5_check(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def download_fastqs(ena: ENAObject, q, output_dir: Path):
+    url = "ftp://" + ena.ftp
+    outfile = output_dir / basename(ena.ftp)
+    wget(url, outfile)
+    md5_f = md5_check(outfile)
+
+    ena.md5_passed = md5_f == ena.md5
+    q.put(ena)
+
+
 def download_project_fastqs(accession, threads, output_dir):
     response = get_files(accession)
 
@@ -229,24 +245,6 @@ def download_project_fastqs(accession, threads, output_dir):
 
         queue.put("kill")
         queue.join()
-
-
-def md5_check(fname):
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-def download_fastqs(ena: ENAObject, q, output_dir: Path):
-    url = "ftp://" + ena.ftp
-    outfile = output_dir / basename(ena.ftp)
-    wget(url, outfile)
-    md5_f = md5_check(outfile)
-
-    ena.md5_passed = md5_f == ena.md5
-    q.put(ena)
 
 
 def arg_parser():
