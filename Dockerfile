@@ -20,7 +20,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY ena_download.py ./ena_download.py
 RUN chmod +x ./ena_download.py
 
-ENV PATH="/opt/ena_download.py:$PATH"
+ENV PATH="/opt:$PATH"
 
 FROM runner AS test
 COPY tests tests
