@@ -65,7 +65,7 @@ class ENADownloader:
         self.progress_file = join(output_dir, f".{accession}.progress.csv")
 
     def wget(self, url, filename, tries=0):
-        print(f"Downloading {filename}")
+        logging.info(f"Downloading {filename}")
 
         try:
             with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -192,14 +192,9 @@ class ENADownloader:
         self.listener()
 
         to_dos = [item for item in response.values() if not item.md5_passed]
-        for i in range(0, len(to_dos), self.threads):
-
-            # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
-            # nor is there any alternative that is
-
-            # This approach currently blocks all other "threads" if even one download is going slow
-            await asyncio.gather(
-                *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos[i:i + self.threads]])
+        # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
+        # nor is there any alternative that is
+        await asyncio.gather(*[asyncio.to_thread(self.download_fastqs, item) for item in to_dos])
 
 
 class Parser:
