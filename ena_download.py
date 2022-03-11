@@ -4,9 +4,9 @@ Robust tool to download fastq.gz files and metadata from ENA
 """
 
 import argparse
+import asyncio
 import hashlib
 import logging
-import multiprocessing as mp
 import os
 import shutil
 import urllib.request as urlrequest
@@ -23,7 +23,7 @@ class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-        self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
+            self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
     ):
         self.run_accession = run_accession
         self.ftp = ftp
@@ -54,7 +54,7 @@ class ENAObject:
 
 class ENADownloader:
     def __init__(
-        self, accession: str, threads: int, output_dir: Path, retries: int = 5
+            self, accession: str, threads: int, output_dir: Path, retries: int = 5
     ):
         self.accession = accession
         self.threads = threads
@@ -72,7 +72,7 @@ class ENADownloader:
                 shutil.copyfileobj(response, out_file)
         except URLError as err:
             if tries <= self.retries:
-                sleeptime = 2**tries
+                sleeptime = 2 ** tries
                 print(
                     f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
@@ -136,25 +136,15 @@ class ENADownloader:
             for data in response_parsed.values():
                 fp.write(str(data) + "\n")
 
-    def listener(self, queue: mp.Queue):
+    def listener(self, m: str = None):
         if not exists(self.progress_file):
             with open(self.progress_file, "w") as f:
                 f.write(f"{ENAObject.header}\n")
 
-        with open(self.progress_file, "a") as f:
-            while True:
-                m = queue.get()
-                assert isinstance(
-                    m, (str, ENAObject)
-                ), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
-                if m == "kill":
-                    queue.task_done()
-                    break
-
-                else:
-                    f.write(str(m) + "\n")
-                    f.flush()
-                    queue.task_done()
+        if m is not None:
+            with open(self.progress_file, "a") as f:
+                f.write(str(m) + "\n")
+                f.flush()
 
     def get_ftp_paths(self, accession):
         if exists(self.response_file):
@@ -186,36 +176,30 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_fastqs(self, ena: ENAObject, queue: mp.Queue, output_dir: Path):
+    def download_fastqs(self, ena: ENAObject):
         url = "ftp://" + ena.ftp
-        outfile = output_dir / basename(ena.ftp)
+        outfile = self.output_dir / basename(ena.ftp)
         self.wget(url, outfile)
         md5_f = self.md5_check(outfile)
 
         ena.md5_passed = md5_f == ena.md5
-        queue.put(ena)
 
-    def download_project_fastqs(self):
+        self.listener(str(ena))
+
+    async def download_project_fastqs(self):
         response = self.get_ftp_paths(self.accession)
+        # Initialise file with header
+        self.listener()
 
-        number_of_threads = self.threads
-        manager = mp.Manager()
-        queue = manager.Queue()
-        with mp.Pool(processes=number_of_threads) as pool:
-            pool.apply_async(self.listener, (queue,))
+        to_dos = [item for item in response.values() if not item.md5_passed]
+        for i in range(0, len(to_dos), self.threads):
 
-            res = pool.starmap_async(
-                self.download_fastqs,
-                [
-                    (item, queue, args.output_dir)
-                    for item in response.values()
-                    if not item.md5_passed
-                ],
-            )
-            res.get()
+            # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
+            # nor is there any alternative that is
 
-            queue.put("kill")
-            queue.join()
+            # This approach currently blocks all other "threads" if even one download is going slow
+            await asyncio.gather(
+                *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos[i:i + self.threads]])
 
 
 class Parser:
@@ -306,4 +290,4 @@ if __name__ == "__main__":
     enadownloader = ENADownloader(
         accession=args.project, threads=args.threads, output_dir=args.output_dir
     )
-    enadownloader.download_project_fastqs()
+    asyncio.run(enadownloader.download_project_fastqs())
