@@ -23,7 +23,7 @@ class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-            self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
+        self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
     ):
         self.run_accession = run_accession
         self.ftp = ftp
@@ -54,7 +54,7 @@ class ENAObject:
 
 class ENADownloader:
     def __init__(
-            self, accession: str, threads: int, output_dir: Path, retries: int = 5
+        self, accession: str, threads: int, output_dir: Path, retries: int = 5
     ):
         self.accession = accession
         self.threads = threads
@@ -72,7 +72,7 @@ class ENADownloader:
                 shutil.copyfileobj(response, out_file)
         except URLError as err:
             if tries <= self.retries:
-                sleeptime = 2 ** tries
+                sleeptime = 2**tries
                 print(
                     f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
@@ -194,7 +194,9 @@ class ENADownloader:
         to_dos = [item for item in response.values() if not item.md5_passed]
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
-        await asyncio.gather(*[asyncio.to_thread(self.download_fastqs, item) for item in to_dos])
+        await asyncio.gather(
+            *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
+        )
 
 
 class Parser:
