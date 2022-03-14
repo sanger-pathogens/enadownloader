@@ -138,7 +138,7 @@ class ENADownloader:
         status_code = response.status_code
         tries = 1
         while status_code >= 300 and retries > 0:
-            sleeptime = 2 ** tries
+            sleeptime = 2**tries
             logging.warning(response.text)
             logging.info(f"Trying to retrieve metadata again after {sleeptime} seconds")
             sleep(sleeptime)
@@ -249,7 +249,7 @@ class ENADownloader:
                 shutil.copyfileobj(response, out_file)
         except URLError as err:
             if tries <= self.retries:
-                sleeptime = 2 ** tries
+                sleeptime = 2**tries
                 print(
                     f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
