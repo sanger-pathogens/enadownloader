@@ -187,6 +187,7 @@ class ENADownloader:
         response = requests.get(url)
         if response.status_code != 200:
             logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
+            response.raise_for_status()
         root = xmltodict.parse(response.content.strip())
         return root["TAXON_SET"]
 
