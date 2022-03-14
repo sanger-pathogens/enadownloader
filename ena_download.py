@@ -134,22 +134,20 @@ class ENADownloader:
             f"&limit=0"
             f"&format=tsv"
         )
-        response = requests.get(url)
-        status_code = response.status_code
-        tries = 1
-        while status_code >= 300 and retries > 0:
-            sleeptime = 2**tries
-            logging.warning(response.text)
-            logging.info(f"Trying to retrieve metadata again after {sleeptime} seconds")
-            sleep(sleeptime)
+        try:
             response = requests.get(url)
-            status_code = response.status_code
-            retries -= 1
-            tries += 1
-        if status_code >= 300:
-            logging.error(f"Failed to retrieve metadata (tried {tries} times)")
             response.raise_for_status()
-        return response
+        except requests.HTTPError as err:
+            if tries <= self.retries:
+                sleeptime = 2**tries
+                logging.warning("Download failed, retrying after {sleeptime} seconds... Reason: {err}")
+                sleep(sleeptime)
+                self.get_metadata(accessions, accession_type, fields, tries + 1)
+            else:
+                logging.error(f"Failed to retrieve metadata (tried {tries} times)")
+                exit(1)
+        else:
+            return response
 
     def parse_metadata(self, response):
         parsed_metadata = []
