@@ -4,7 +4,10 @@ Robust tool to download fastq.gz files and metadata from ENA
 """
 
 import argparse
+import csv
 import hashlib
+import io
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -13,10 +16,12 @@ import urllib.request as urlrequest
 from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
+import re
 from time import sleep
 from urllib.error import URLError
 
 import requests
+import xmltodict
 
 
 class ENAObject:
@@ -63,6 +68,117 @@ class ENADownloader:
 
         self.response_file = join(output_dir, f".{accession}.csv")
         self.progress_file = join(output_dir, f".{accession}.progress.csv")
+
+    def validate_run_accession(self, run_accession):
+        if not re.match('(SRR|ERR|DRR)', run_accession):
+            raise ValueError(f"Invalid run accession {run_accession}")
+
+    def parse_run_accessions(self, filepath):
+        run_accessions = set()
+        with open(filepath) as f:
+            for line in f:
+                run_accession = line.strip()
+                try:
+                    self.validate_run_accession(run_accession)
+                except ValueError:
+                    #TODO Should we log warning or error. Skip accession or bail out?
+                    logging.warning(f"Skipping invalid run accession: {run_accession}")
+                    continue
+                run_accessions.add(run_accession)
+        return run_accessions
+
+    def get_metadata(self, accessions, accession_type="run", fields=("fastq_ftp", "fastq_md5", "tax_id")):
+        """Note run_accession and sample_accession fields are always included for run accession metadata"""
+        url = (
+            "https://www.ebi.ac.uk/ena/portal/api/search?"
+            "result=read_run"
+            f"&fields={','.join(fields)}"
+            f"&includeAccessionType={accession_type}"
+            f"&includeAccessions={','.join(accessions)}"
+            f"&limit=0"
+            f"&format=tsv"
+        )
+        rp = 400
+        while rp >= 300:
+            response = requests.get(url)
+            rp = response.status_code
+            if rp >= 300:
+                logging.warning(response.text)
+                sleep(5)
+        return response
+
+        # metadata_parsed = self.parse_metadata(response)
+        # self.write_metadata_file(metadata_parsed)
+        #
+        # return metadata_parsed
+
+    def parse_metadata(self, response):
+        parsed_metadata = []
+        csv.register_dialect('unix-tab', delimiter='\t')
+        reader = csv.DictReader(io.StringIO(response.text), dialect='unix-tab')
+        for row in reader:
+            try:
+                new_rows = self.flatten_multivalued_ftp_attrs(row)
+            except self.InvalidRow:
+                logging.warning(f"Found invalid metadata for run accession {row['run_accession']} - Skipping.")
+                continue
+            for new_row in new_rows:
+                parsed_metadata.append(new_row)
+        return parsed_metadata
+
+    def write_metadata_file(self, parsed_metadata, output_file="metadata.tsv"):
+        csv.register_dialect('unix-tab', delimiter='\t')
+        fieldnames = parsed_metadata[0].keys()  #TODO Can we rely on the order of this?
+
+        with open(output_file, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames, dialect='unix-tab')
+            writer.writeheader()
+            for row in parsed_metadata:
+                writer.writerow(row)
+
+    class InvalidRow(ValueError):
+        pass
+
+    def is_invalid_row(self, row):
+        if not row['fastq_ftp']:
+            raise self.InvalidRow
+
+    def flatten_multivalued_ftp_attrs(self, row):
+        if not row["fastq_ftp"].strip():
+            raise self.InvalidRow
+        ftp_links = row["fastq_ftp"].split(";")
+        md5s = row["fastq_md5"].split(";")
+        if len(md5s) != len(ftp_links):
+            raise self.InvalidRow
+        rows = []
+        for f, m in zip(ftp_links, md5s):
+            new_row = row.copy()
+            new_row["fastq_ftp"] = f
+            new_row["fastq_md5"] = m
+            rows.append(new_row)
+        return rows
+
+    def get_taxonomy(self, taxon_id):
+        url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
+        root = xmltodict.parse(response.content.strip())
+        return root["TAXON_SET"]
+        # return json.dumps(root["TAXON_SET"])
+
+    def get_scientific_name(self, taxonomy):
+        return taxonomy["taxon"]["@scientificName"]
+
+    def split_scientific_name(self, name: str):
+        names = [n.strip() for n in name.split(maxsplit=1)]
+        try:
+            genus, species_subspecies = names
+        except ValueError:
+            logging.error(f"Unexpected number of taxonomy names found in scientific name: {name}")
+            raise
+        return names
+
 
     def wget(self, url, filename, tries=0):
         print(f"Downloading {filename}")
@@ -287,23 +403,55 @@ class Parser:
 
 
 if __name__ == "__main__":
-    args = Parser.arg_parser()
-    this_file = join(args.output_dir, basename(splitext(__file__)[0]))
-
-    # Set up logging
-    fh = logging.FileHandler(f"{this_file}.log", mode="w")
-    fh.setLevel(logging.DEBUG)
-    sh = logging.StreamHandler()
-
-    # noinspection PyArgumentList
-    logging.basicConfig(
-        level=args.log_level,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[fh, sh],
-    )
+    # args = Parser.arg_parser()
+    # this_file = join(args.output_dir, basename(splitext(__file__)[0]))
+    #
+    # # Set up logging
+    # fh = logging.FileHandler(f"{this_file}.log", mode="w")
+    # fh.setLevel(logging.DEBUG)
+    # sh = logging.StreamHandler()
+    #
+    # # noinspection PyArgumentList
+    # logging.basicConfig(
+    #     level=args.log_level,
+    #     format="%(asctime)s - %(levelname)s - %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    #     handlers=[fh, sh],
+    # )
+    #
+    # enadownloader = ENADownloader(
+    #     accession=args.project, threads=args.threads, output_dir=args.output_dir
+    # )
+    # enadownloader.download_project_fastqs()
 
     enadownloader = ENADownloader(
-        accession=args.project, threads=args.threads, output_dir=args.output_dir
+        accession='nonsense', threads=2, output_dir='output_dir'
     )
-    enadownloader.download_project_fastqs()
+    # metadata = enadownloader.download_run_metadata()
+    # enadownloader.write_metadata_file(metadata)
+    # for row in metadata:
+    #     print(row['tax_id'])
+
+    # Note: cannot handle GEO accessions (from NCBI's Gene Expression Omnibus) e.g. "GSM4907283"
+    # enadownloader.get_metadata(["SRR9984183",
+    #                             "SRR13191702",
+    #                             "ERR1160846",
+    #                             "ERR1109373",
+    #                             "DRR028935",
+    #                             "DRR026872",
+    #                             "SRR12848126",
+    #                             "SRR14593545",
+    #                             "SRR14709033",])
+
+    # Check we can get taxonomy
+    # json_taxonomy = enadownloader.get_taxonomy(408170)
+    # name = enadownloader.get_scientific_name(json_taxonomy)
+    # names = enadownloader.split_scientific_name(name)
+    # print(names)
+
+    run_accessions = enadownloader.parse_run_accessions("sra_ids_test.txt")
+    response = enadownloader.get_metadata(run_accessions)
+    parsed_metadata = enadownloader.parse_metadata(response)
+    enadownloader.write_metadata_file(parsed_metadata, "metadata.tsv")
+    for row in parsed_metadata:
+        print(row)
