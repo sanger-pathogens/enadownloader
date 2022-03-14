@@ -60,15 +60,22 @@ class ENAObject:
 
 class ENADownloader:
     def __init__(
-        self, accession: str, threads: int, output_dir: Path, retries: int = 5
+        self,
+        input_file: str,
+        accession_type: str,
+        threads: int,
+        output_dir: Path,
+        retries: int = 5,
     ):
-        self.accession = accession
+        self.input_file = input_file
+        self.input_filename = splitext(basename(input_file))[0]
+        self.accession_type = accession_type
         self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
 
-        self.response_file = join(output_dir, f".{accession}.csv")
-        self.progress_file = join(output_dir, f".{accession}.progress.csv")
+        self.response_file = join(output_dir, f".{self.input_filename}.csv")
+        self.progress_file = join(output_dir, f".{self.input_filename}.progress.csv")
 
     def validate_accession(self, accession, accession_type):
         if accession_type == "run":
@@ -344,7 +351,9 @@ class ENADownloader:
         queue.put(ena)
 
     def download_project_fastqs(self):
-        response = self.get_ftp_paths(self.accession)
+        response = self.get_ftp_paths(
+            self.input_file, accession_type=self.accession_type
+        )
 
         number_of_threads = self.threads
         manager = mp.Manager()
