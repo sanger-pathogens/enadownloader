@@ -450,57 +450,66 @@ class Parser:
 
 
 if __name__ == "__main__":
-    # args = Parser.arg_parser()
-    # this_file = join(args.output_dir, basename(splitext(__file__)[0]))
-    #
-    # # Set up logging
-    # fh = logging.FileHandler(f"{this_file}.log", mode="w")
-    # fh.setLevel(logging.DEBUG)
-    # sh = logging.StreamHandler()
-    #
-    # # noinspection PyArgumentList
-    # logging.basicConfig(
-    #     level=args.log_level,
-    #     format="%(asctime)s - %(levelname)s - %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%S",
-    #     handlers=[fh, sh],
-    # )
-    #
-    # enadownloader = ENADownloader(
-    #     accession=args.project, threads=args.threads, output_dir=args.output_dir
-    # )
-    # enadownloader.download_project_fastqs()
+    args = Parser.arg_parser()
+    this_file = join(args.output_dir, basename(splitext(__file__)[0]))
+
+    # Set up logging
+    fh = logging.FileHandler(f"{this_file}.log", mode="w")
+    fh.setLevel(logging.DEBUG)
+    sh = logging.StreamHandler()
+
+    # noinspection PyArgumentList
+    logging.basicConfig(
+        level=args.log_level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[fh, sh],
+    )
 
     enadownloader = ENADownloader(
-        accession="nonsense", threads=2, output_dir="output_dir"
+        input_file=args.input,
+        accession_type=args.type,
+        threads=args.threads,
+        output_dir=args.output_dir,
     )
-    # metadata = enadownloader.download_run_metadata()
-    # enadownloader.write_metadata_file(metadata)
-    # for row in metadata:
-    #     print(row['tax_id'])
+    enadownloader.download_project_fastqs()
 
-    # Note: cannot handle GEO accessions (from NCBI's Gene Expression Omnibus) e.g. "GSM4907283"
-    # enadownloader.get_metadata(["SRR9984183",
-    #                             "SRR13191702",
-    #                             "ERR1160846",
-    #                             "ERR1109373",
-    #                             "DRR028935",
-    #                             "DRR026872",
-    #                             "SRR12848126",
-    #                             "SRR14593545",
-    #                             "SRR14709033",])
-
-    # Check we can get taxonomy
-    # json_taxonomy = enadownloader.get_taxonomy(408170)
-    # name = enadownloader.get_scientific_name(json_taxonomy)
-    # names = enadownloader.split_scientific_name(name)
-    # print(names)
-
-    run_accessions = enadownloader.parse_run_accessions("sra_ids_test.txt")
-    response = enadownloader.get_metadata(run_accessions, fields=None, retries=1)
-    parsed_metadata = enadownloader.parse_metadata(response)
-    enadownloader.write_metadata_file(parsed_metadata, "metadata.tsv")
-    for row in parsed_metadata:
-        print(row)
-    fields = enadownloader.get_available_fields()
-    print(fields)
+    # Various bits of test code...
+    # enadownloader = ENADownloader(
+    #     accession="nonsense", threads=2, output_dir="output_dir"
+    # )
+    # # metadata = enadownloader.download_run_metadata()
+    # # enadownloader.write_metadata_file(metadata)
+    # # for row in metadata:
+    # #     print(row['tax_id'])
+    #
+    # # Note: cannot handle GEO accessions (from NCBI's Gene Expression Omnibus) e.g. "GSM4907283"
+    # # enadownloader.get_metadata(["SRR9984183",
+    # #                             "SRR13191702",
+    # #                             "ERR1160846",
+    # #                             "ERR1109373",
+    # #                             "DRR028935",
+    # #                             "DRR026872",
+    # #                             "SRR12848126",
+    # #                             "SRR14593545",
+    # #                             "SRR14709033",])
+    #
+    # # Check we can get taxonomy
+    # # json_taxonomy = enadownloader.get_taxonomy(408170)
+    # # name = enadownloader.get_scientific_name(json_taxonomy)
+    # # names = enadownloader.split_scientific_name(name)
+    # # print(names)
+    #
+    # run_accessions = enadownloader.parse_run_accessions("sra_ids_test.txt")
+    # response = enadownloader.get_metadata(run_accessions, fields=None, retries=1)
+    # parsed_metadata = enadownloader.parse_metadata(response)
+    # enadownloader.write_metadata_file(parsed_metadata, "metadata.tsv")
+    # # for row in parsed_metadata:
+    # #     print(row)
+    # # fields = enadownloader.get_available_fields()
+    # # print(fields)
+    #
+    # # get_metadata works for a study/sample accessions too...
+    # response2 = enadownloader.get_metadata(["PRJDB4356"], accession_type="study", fields=("fastq_ftp", "fastq_md5", "tax_id"), retries=1)
+    # parsed_metadata2 = enadownloader.parse_metadata(response2)
+    # print(parsed_metadata2)
