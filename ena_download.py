@@ -53,9 +53,7 @@ class ENAObject:
 
 
 class ENADownloader:
-    def __init__(
-        self, accession: str, output_dir: Path, retries: int = 5
-    ):
+    def __init__(self, accession: str, output_dir: Path, retries: int = 5):
         self.accession = accession
         self.output_dir = output_dir
         self.retries = retries
