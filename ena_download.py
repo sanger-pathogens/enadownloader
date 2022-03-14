@@ -204,7 +204,7 @@ class ENADownloader:
         pass
 
     def flatten_multivalued_ftp_attrs(self, row):
-        if not row["fastq_ftp"].strip():
+        if "fastq_ftp" in row and not row["fastq_ftp"].strip():
             raise self.InvalidRow
         ftp_links = row["fastq_ftp"].split(";")
         md5s = row["fastq_md5"].split(";")
