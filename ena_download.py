@@ -105,11 +105,13 @@ class ENADownloader:
         result_type = "read_run"
         url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
         response = requests.get(url)
-        if response.status_code != requests.codes.ok:
+        try:
+            response.raise_for_status()
+        except requests.HTTPError:
             logging.error(
                 f"Could not get available fields for ENA result type: {result_type}"
             )
-            response.raise_for_status()
+            exit(1)
         fields = [entry["columnId"] for entry in json.loads(response.text)]
         return fields
 
