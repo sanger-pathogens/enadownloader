@@ -383,22 +383,28 @@ class Parser:
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
         parser.add_argument(
-            "-p",
-            "--project",
+            "-i",
+            "--input",
             required=True,
-            help="ENA project identifier",
+            help="Path to file containing ENA accessions",
+        )
+        parser.add_argument(
+            "-t",
+            "--type",
+            required=True,
+            help="Type of ENA accessions",
         )
         parser.add_argument(
             "-o",
             "--output_dir",
             default=os.getcwd(),
             type=cls.validate_dir,
-            help="directory in which to save downloaded files",
+            help="Directory in which to save downloaded files",
         )
         parser.add_argument(
-            "-t",
+            "-@",
             "--threads",
-            default=1,
+            default=2,
             type=cls.validate_threads,
             help="Number of threads to use for download",
         )
