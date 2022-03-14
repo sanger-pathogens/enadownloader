@@ -392,6 +392,7 @@ class Parser:
             "-t",
             "--type",
             required=True,
+            choices=["run", "study"],
             help="Type of ENA accessions",
         )
         parser.add_argument(
