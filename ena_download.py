@@ -105,6 +105,7 @@ class ENADownloader:
         accessions: Iterable[str],
         accession_type: str = "run",
         fields: Iterable[str] = None,
+        retries: int = 0,
     ) -> requests.Response:
         """Note run_accession and sample_accession fields are always included for run accession metadata
         (even when these are not specified in `fields` arg)
@@ -120,13 +121,21 @@ class ENADownloader:
             f"&limit=0"
             f"&format=tsv"
         )
-        rp = 400
-        while rp >= 300:
+        response = requests.get(url)
+        status_code = response.status_code
+        tries = 1
+        while status_code >= 300 and retries > 0:
+            sleeptime = 2 ** tries
+            logging.warning(response.text)
+            logging.info(f"Trying to retrieve metadata again after {sleeptime} seconds")
+            sleep(sleeptime)
             response = requests.get(url)
-            rp = response.status_code
-            if rp >= 300:
-                logging.warning(response.text)
-                sleep(5)
+            status_code = response.status_code
+            retries -= 1
+            tries += 1
+        if status_code >= 300:
+            logging.error(f"Failed to retrieve metadata (tried {tries} times)")
+            response.raise_for_status()
         return response
 
     def parse_metadata(self, response):
@@ -465,9 +474,7 @@ if __name__ == "__main__":
     # print(names)
 
     run_accessions = enadownloader.parse_run_accessions("sra_ids_test.txt")
-    response = enadownloader.get_metadata(
-        run_accessions, fields=("fastq_ftp", "fastq_md5", "tax_id")
-    )
+    response = enadownloader.get_metadata(run_accessions, fields=None, retries=1)
     parsed_metadata = enadownloader.parse_metadata(response)
     enadownloader.write_metadata_file(parsed_metadata, "metadata.tsv")
     for row in parsed_metadata:
