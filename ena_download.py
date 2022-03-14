@@ -220,10 +220,12 @@ class ENADownloader:
 
     def get_taxonomy(self, taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
-        response = requests.get(url)
-        if response.status_code != 200:
-            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
+        try:
+            response = requests.get(url)
             response.raise_for_status()
+        except requests.HTTPError:
+            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
+            exit(1)
         root = xmltodict.parse(response.content.strip())
         return root["TAXON_SET"]
 
