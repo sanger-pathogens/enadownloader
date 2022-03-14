@@ -54,10 +54,9 @@ class ENAObject:
 
 class ENADownloader:
     def __init__(
-        self, accession: str, threads: int, output_dir: Path, retries: int = 5
+        self, accession: str, output_dir: Path, retries: int = 5
     ):
         self.accession = accession
-        self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
 
@@ -73,13 +72,15 @@ class ENADownloader:
         except URLError as err:
             if tries <= self.retries:
                 sleeptime = 2**tries
-                print(
+                logging.warning(
                     f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
             else:
-                raise
+                # We probably don't want the program to terminate upon one failure,
+                # but give the users a unique value to search for
+                logging.warning(f"Download of {basename(filename)} failed entirely!")
 
     @staticmethod
     def parse_file_report(response: requests.Response):
@@ -220,11 +221,11 @@ class Parser:
             help="directory in which to save downloaded files",
         )
         parser.add_argument(
-            "-t",
-            "--threads",
-            default=1,
-            type=cls.validate_threads,
-            help="Number of threads to use for download",
+            "-r",
+            "--retries",
+            default=5,
+            type=cls.validate_retries,
+            help="Amount to retry each fastq file upon download interruption",
         )
         parser.add_argument(
             "-v",
@@ -254,22 +255,22 @@ class Parser:
         return Path(path).resolve()
 
     @staticmethod
-    def validate_threads(threads: str):
+    def validate_retries(retries: str):
         try:
-            threads = int(threads)
+            retries = int(retries)
         except ValueError:
-            raise argparse.ArgumentTypeError(f"invalid int value: {threads!r}")
-        if 1 < threads <= 100:
-            return threads
+            raise argparse.ArgumentTypeError(f"invalid int value: {retries!r}")
+        if retries >= 0:
+            return retries
         else:
             raise argparse.ArgumentTypeError(
-                f"invalid int value (must be between 2 and 100): {threads!r}"
+                f"invalid int value (must be positive): {retries!r}"
             )
 
 
 if __name__ == "__main__":
     args = Parser.arg_parser()
-    this_file = join(args.output_dir, basename(splitext(__file__)[0]))
+    this_file = join(os.getcwd(), basename(splitext(__file__)[0]))
 
     # Set up logging
     fh = logging.FileHandler(f"{this_file}.log", mode="w")
@@ -285,6 +286,6 @@ if __name__ == "__main__":
     )
 
     enadownloader = ENADownloader(
-        accession=args.project, threads=args.threads, output_dir=args.output_dir
+        accession=args.project, output_dir=args.output_dir, retries=args.retries
     )
     asyncio.run(enadownloader.download_project_fastqs())
