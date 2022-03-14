@@ -118,7 +118,7 @@ class ENADownloader:
         accessions: Iterable[str],
         accession_type: str = "run",
         fields: Iterable[str] = None,
-        retries: int = 0,
+        tries: int = 0,
     ) -> requests.Response:
         """Note run_accession and sample_accession fields are always included for run accession metadata
         (even when these are not specified in `fields` arg)
