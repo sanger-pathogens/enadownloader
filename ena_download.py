@@ -71,7 +71,7 @@ class ENADownloader:
             if tries <= self.retries:
                 sleeptime = 2**tries
                 logging.warning(
-                    f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
+                    f"Download of {basename(filename)} failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
