@@ -79,10 +79,10 @@ class ENADownloader:
 
     def validate_accession(self, accession, accession_type):
         if accession_type == "run":
-            if not re.match("(SRR|ERR|DRR)", accession):
+            if not accession.startswith(("SRR","ERR","DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
         elif accession_type == "study":
-            if not re.match("(SRP|ERP|DRP|PRJ)", accession):
+            if not accession.startswith(("SRP","ERP","DRP","PRJ")):
                 raise ValueError(f"Invalid study accession: {accession}")
         else:
             raise ValueError(f"Invalid accession_type: {accession_type}")
