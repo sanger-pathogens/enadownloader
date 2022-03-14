@@ -70,23 +70,29 @@ class ENADownloader:
         self.response_file = join(output_dir, f".{accession}.csv")
         self.progress_file = join(output_dir, f".{accession}.progress.csv")
 
-    def validate_run_accession(self, run_accession):
-        if not re.match("(SRR|ERR|DRR)", run_accession):
-            raise ValueError(f"Invalid run accession {run_accession}")
+    def validate_accession(self, accession, accession_type):
+        if accession_type == "run":
+            if not re.match("(SRR|ERR|DRR)", accession):
+                raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "study":
+            if not re.match("(SRP|ERP|DRP|PRJ)", accession):
+                raise ValueError(f"Invalid study accession: {accession}")
+        else:
+            raise ValueError(f"Invalid accession_type: {accession_type}")
 
-    def parse_run_accessions(self, filepath):
-        run_accessions = set()
+    def parse_accessions(self, filepath, accession_type="run"):
+        accessions = set()
         with open(filepath) as f:
             for line in f:
-                run_accession = line.strip()
+                accession = line.strip()
                 try:
-                    self.validate_run_accession(run_accession)
+                    self.validate_accession(accession, accession_type)
                 except ValueError:
                     # TODO Should we log warning or error. Skip accession or bail out?
-                    logging.warning(f"Skipping invalid run accession: {run_accession}")
+                    logging.warning(f"Skipping invalid run accession: {accession}")
                     continue
-                run_accessions.add(run_accession)
-        return run_accessions
+                accessions.add(accession)
+        return accessions
 
     def get_available_fields(self):
         result_type = "read_run"
