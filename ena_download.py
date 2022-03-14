@@ -12,6 +12,7 @@ import logging
 import multiprocessing as mp
 import os
 import shutil
+from typing import Iterable
 import urllib.request as urlrequest
 from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
@@ -70,7 +71,7 @@ class ENADownloader:
         self.progress_file = join(output_dir, f".{accession}.progress.csv")
 
     def validate_run_accession(self, run_accession):
-        if not re.match('(SRR|ERR|DRR)', run_accession):
+        if not re.match("(SRR|ERR|DRR)", run_accession):
             raise ValueError(f"Invalid run accession {run_accession}")
 
     def parse_run_accessions(self, filepath):
@@ -81,14 +82,35 @@ class ENADownloader:
                 try:
                     self.validate_run_accession(run_accession)
                 except ValueError:
-                    #TODO Should we log warning or error. Skip accession or bail out?
+                    # TODO Should we log warning or error. Skip accession or bail out?
                     logging.warning(f"Skipping invalid run accession: {run_accession}")
                     continue
                 run_accessions.add(run_accession)
         return run_accessions
 
-    def get_metadata(self, accessions, accession_type="run", fields=("fastq_ftp", "fastq_md5", "tax_id")):
-        """Note run_accession and sample_accession fields are always included for run accession metadata"""
+    def get_available_fields(self):
+        result_type = "read_run"
+        url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
+        response = requests.get(url)
+        if response.status_code != requests.codes.ok:
+            logging.error(
+                f"Could not get available fields for ENA result type: {result_type}"
+            )
+            response.raise_for_status()
+        fields = [entry["columnId"] for entry in json.loads(response.text)]
+        return fields
+
+    def get_metadata(
+        self,
+        accessions: Iterable[str],
+        accession_type: str = "run",
+        fields: Iterable[str] = None,
+    ) -> requests.Response:
+        """Note run_accession and sample_accession fields are always included for run accession metadata
+        (even when these are not specified in `fields` arg)
+        """
+        if fields is None:
+            fields = self.get_available_fields()
         url = (
             "https://www.ebi.ac.uk/ena/portal/api/search?"
             "result=read_run"
@@ -107,41 +129,34 @@ class ENADownloader:
                 sleep(5)
         return response
 
-        # metadata_parsed = self.parse_metadata(response)
-        # self.write_metadata_file(metadata_parsed)
-        #
-        # return metadata_parsed
-
     def parse_metadata(self, response):
         parsed_metadata = []
-        csv.register_dialect('unix-tab', delimiter='\t')
-        reader = csv.DictReader(io.StringIO(response.text), dialect='unix-tab')
+        csv.register_dialect("unix-tab", delimiter="\t")
+        reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
         for row in reader:
             try:
                 new_rows = self.flatten_multivalued_ftp_attrs(row)
             except self.InvalidRow:
-                logging.warning(f"Found invalid metadata for run accession {row['run_accession']} - Skipping.")
+                logging.warning(
+                    f"Found invalid metadata for run accession {row['run_accession']} - Skipping."
+                )
                 continue
             for new_row in new_rows:
                 parsed_metadata.append(new_row)
         return parsed_metadata
 
     def write_metadata_file(self, parsed_metadata, output_file="metadata.tsv"):
-        csv.register_dialect('unix-tab', delimiter='\t')
-        fieldnames = parsed_metadata[0].keys()  #TODO Can we rely on the order of this?
+        csv.register_dialect("unix-tab", delimiter="\t")
+        fieldnames = parsed_metadata[0].keys()  # TODO Can we rely on the order of this?
 
-        with open(output_file, 'w') as f:
-            writer = csv.DictWriter(f, fieldnames, dialect='unix-tab')
+        with open(output_file, "w") as f:
+            writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
             writer.writeheader()
             for row in parsed_metadata:
                 writer.writerow(row)
 
     class InvalidRow(ValueError):
         pass
-
-    def is_invalid_row(self, row):
-        if not row['fastq_ftp']:
-            raise self.InvalidRow
 
     def flatten_multivalued_ftp_attrs(self, row):
         if not row["fastq_ftp"].strip():
@@ -165,7 +180,6 @@ class ENADownloader:
             logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
         root = xmltodict.parse(response.content.strip())
         return root["TAXON_SET"]
-        # return json.dumps(root["TAXON_SET"])
 
     def get_scientific_name(self, taxonomy):
         return taxonomy["taxon"]["@scientificName"]
@@ -175,10 +189,11 @@ class ENADownloader:
         try:
             genus, species_subspecies = names
         except ValueError:
-            logging.error(f"Unexpected number of taxonomy names found in scientific name: {name}")
+            logging.error(
+                f"Unexpected number of taxonomy names found in scientific name: {name}"
+            )
             raise
         return names
-
 
     def wget(self, url, filename, tries=0):
         print(f"Downloading {filename}")
@@ -188,7 +203,7 @@ class ENADownloader:
                 shutil.copyfileobj(response, out_file)
         except URLError as err:
             if tries <= self.retries:
-                sleeptime = 2**tries
+                sleeptime = 2 ** tries
                 print(
                     f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
@@ -425,7 +440,7 @@ if __name__ == "__main__":
     # enadownloader.download_project_fastqs()
 
     enadownloader = ENADownloader(
-        accession='nonsense', threads=2, output_dir='output_dir'
+        accession="nonsense", threads=2, output_dir="output_dir"
     )
     # metadata = enadownloader.download_run_metadata()
     # enadownloader.write_metadata_file(metadata)
@@ -450,8 +465,12 @@ if __name__ == "__main__":
     # print(names)
 
     run_accessions = enadownloader.parse_run_accessions("sra_ids_test.txt")
-    response = enadownloader.get_metadata(run_accessions)
+    response = enadownloader.get_metadata(
+        run_accessions, fields=("fastq_ftp", "fastq_md5", "tax_id")
+    )
     parsed_metadata = enadownloader.parse_metadata(response)
     enadownloader.write_metadata_file(parsed_metadata, "metadata.tsv")
     for row in parsed_metadata:
         print(row)
+    fields = enadownloader.get_available_fields()
+    print(fields)
