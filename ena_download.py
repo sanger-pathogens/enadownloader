@@ -160,6 +160,29 @@ class ENADownloader:
                 parsed_metadata.append(new_row)
         return parsed_metadata
 
+    def get_ftp_paths(self, filepath, accession_type="run"):
+        if exists(self.response_file):
+            response_parsed = self.load_response()
+            logging.info("Loaded existing response file")
+        else:
+            accessions = self.parse_accessions(filepath, accession_type=accession_type)
+            response = self.get_metadata(
+                accessions,
+                accession_type=accession_type,
+                fields=("fastq_ftp", "fastq_md5", "tax_id"),
+                retries=1,
+            )
+            parsed_metadata = self.parse_metadata(response)
+            response_parsed = {}
+            for row in parsed_metadata:
+                obj = ENAObject(
+                    row["run_accession"], row["fastq_ftp"], row["fastq_md5"]
+                )
+                response_parsed[obj.key] = obj
+            self.write_response_file(response_parsed)
+            logging.info("Parsed metadata into response file")
+        return response_parsed
+
     def write_metadata_file(self, parsed_metadata, output_file="metadata.tsv"):
         csv.register_dialect("unix-tab", delimiter="\t")
         fieldnames = parsed_metadata[0].keys()  # TODO Can we rely on the order of this?
@@ -302,28 +325,6 @@ class ENADownloader:
                     f.write(str(m) + "\n")
                     f.flush()
                     queue.task_done()
-
-    def get_ftp_paths(self, accession):
-        if exists(self.response_file):
-            response_parsed = self.load_response()
-
-        else:
-            url = (
-                f"https://www.ebi.ac.uk/ena/portal/api/filereport?"
-                f"accession={accession}&result=read_run&fields=fastq_ftp,fastq_md5&limit=0"
-            )
-            rp = 400
-            while rp >= 300:
-                response = requests.get(url)
-                rp = response.status_code
-                if rp >= 300:
-                    logging.warning(response.text)
-                    sleep(5)
-
-            response_parsed = self.parse_file_report(response)
-            self.write_response_file(response_parsed)
-
-        return response_parsed
 
     @staticmethod
     def md5_check(fname):

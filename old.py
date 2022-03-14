@@ -25,3 +25,25 @@ Functions to implement later
 #     for a in accessions:
 #         p = mp.Process(target=download_fasta, args=(a,))
 #         p.start()
+
+# def get_ftp_paths(self, accession):
+#     if exists(self.response_file):
+#         response_parsed = self.load_response()
+#
+#     else:
+#         url = (
+#             f"https://www.ebi.ac.uk/ena/portal/api/filereport?"
+#             f"accession={accession}&result=read_run&fields=fastq_ftp,fastq_md5&limit=0"
+#         )
+#         rp = 400
+#         while rp >= 300:
+#             response = requests.get(url)
+#             rp = response.status_code
+#             if rp >= 300:
+#                 logging.warning(response.text)
+#                 sleep(5)
+#
+#         response_parsed = self.parse_file_report(response)
+#         self.write_response_file(response_parsed)
+#
+#     return response_parsed
