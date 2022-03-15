@@ -56,52 +56,14 @@ class ENAObject:
         return f"{self.__class__.__name__}: {str(self)}"
 
 
-class ENADownloader:
+class ENAMetadata:
     class InvalidRow(ValueError):
         pass
 
-    def __init__(
-        self,
-        input_file: str,
-        accession_type: str,
-        threads: int,
-        metadata_file: str,
-        output_dir: Path,
-        retries: int = 5,
-    ):
-        self.input_file = input_file
-        self.input_filename = splitext(basename(input_file))[0]
-        self.accession_type = accession_type
-        self.threads = threads
-        self.metadata_file = metadata_file
+    def __init__(self, output_dir: Path, metadata_filename: str, retries: int):
         self.output_dir = output_dir
+        self.metadata_file = output_dir / metadata_filename
         self.retries = retries
-
-        self.response_file = join(output_dir, f".{self.input_filename}.csv")
-        self.progress_file = join(output_dir, f".{self.input_filename}.progress.csv")
-
-    def validate_accession(self, accession, accession_type):
-        if accession_type == "run":
-            if not accession.startswith(("SRR", "ERR", "DRR")):
-                raise ValueError(f"Invalid run accession: {accession}")
-        elif accession_type == "study":
-            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
-                raise ValueError(f"Invalid study accession: {accession}")
-        else:
-            raise ValueError(f"Invalid accession_type: {accession_type}")
-
-    def parse_accessions(self, filepath, accession_type="run"):
-        accessions = set()
-        with open(filepath) as f:
-            for line in f:
-                accession = line.strip()
-                try:
-                    self.validate_accession(accession, accession_type)
-                except ValueError as err:
-                    logging.warning(f"{err}. Skipping...")
-                    continue
-                accessions.add(accession)
-        return accessions
 
     def get_available_fields(self):
         result_type = "read_run"
@@ -155,55 +117,6 @@ class ENADownloader:
         else:
             return response
 
-    def parse_metadata(self, response):
-        parsed_metadata = []
-        csv.register_dialect("unix-tab", delimiter="\t")
-        reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
-        for row in reader:
-            try:
-                new_rows = self.flatten_multivalued_ftp_attrs(row)
-            except self.InvalidRow as err:
-                logging.warning(
-                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
-                )
-                continue
-            for new_row in new_rows:
-                parsed_metadata.append(new_row)
-        return parsed_metadata
-
-    def get_ftp_paths(self, filepath, accession_type="run"):
-        if exists(self.response_file):
-            response_parsed = self.load_response()
-            logging.info("Loaded existing response file")
-        else:
-            accessions = self.parse_accessions(filepath, accession_type=accession_type)
-            response = self.get_metadata(
-                accessions,
-                accession_type=accession_type,
-                fields=("fastq_ftp", "fastq_md5", "tax_id"),
-                tries=1,
-            )
-            parsed_metadata = self.parse_metadata(response)
-            response_parsed = {}
-            for row in parsed_metadata:
-                obj = ENAObject(
-                    row["run_accession"], row["fastq_ftp"], row["fastq_md5"]
-                )
-                response_parsed[obj.key] = obj
-            self.write_response_file(response_parsed)
-            logging.info("Parsed metadata into response file")
-        return response_parsed
-
-    def write_metadata_file(self, parsed_metadata):
-        csv.register_dialect("unix-tab", delimiter="\t")
-        fieldnames = sorted(parsed_metadata[0].keys())
-
-        with open(self.metadata_file, "w") as f:
-            writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
-            writer.writeheader()
-            for row in parsed_metadata:
-                writer.writerow(row)
-
     def flatten_multivalued_ftp_attrs(self, row):
         if "fastq_ftp" in row and not row["fastq_ftp"].strip():
             raise self.InvalidRow("No FTP URL was found")
@@ -220,6 +133,32 @@ class ENADownloader:
             new_row["fastq_md5"] = m
             rows.append(new_row)
         return rows
+
+    def parse_metadata(self, response):
+        parsed_metadata = []
+        csv.register_dialect("unix-tab", delimiter="\t")
+        reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
+        for row in reader:
+            try:
+                new_rows = self.flatten_multivalued_ftp_attrs(row)
+            except self.InvalidRow as err:
+                logging.warning(
+                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
+                )
+                continue
+            for new_row in new_rows:
+                parsed_metadata.append(new_row)
+        return parsed_metadata
+
+    def write_metadata_file(self, parsed_metadata):
+        csv.register_dialect("unix-tab", delimiter="\t")
+        fieldnames = sorted(parsed_metadata[0].keys())
+
+        with open(self.metadata_file, "w") as f:
+            writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
+            writer.writeheader()
+            for row in parsed_metadata:
+                writer.writerow(row)
 
     def get_taxonomy(self, taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
@@ -246,6 +185,74 @@ class ENADownloader:
             )
             raise
         return names
+
+
+class ENADownloader:
+    def __init__(
+        self,
+        input_file: str,
+        accession_type: str,
+        threads: int,
+        metadata_file: str,
+        output_dir: Path,
+        retries: int = 5,
+    ):
+        self.input_file = input_file
+        self.input_filename = splitext(basename(input_file))[0]
+        self.accessions_type = accession_type
+        self.threads = threads
+        self.output_dir = output_dir
+        self.retries = retries
+        self.metadata_getter = ENAMetadata(self.output_dir, "metadata.tsv", self.retries)
+
+        self.response_file = join(output_dir, f".{self.input_filename}.csv")
+        self.progress_file = join(output_dir, f".{self.input_filename}.progress.csv")
+
+    def validate_accession(self, accession, accession_type):
+        if accession_type == "run":
+            if not accession.startswith(("SRR", "ERR", "DRR")):
+                raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "study":
+            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
+                raise ValueError(f"Invalid study accession: {accession}")
+        else:
+            raise ValueError(f"Invalid accession_type: {accession_type}")
+
+    def parse_accessions(self, filepath, accession_type="run"):
+        accessions = set()
+        with open(filepath) as f:
+            for line in f:
+                accession = line.strip()
+                try:
+                    self.validate_accession(accession, accession_type)
+                except ValueError as err:
+                    logging.warning(f"{err}. Skipping...")
+                    continue
+                accessions.add(accession)
+        return accessions
+
+    def get_ftp_paths(self, filepath, accession_type="run"):
+        if exists(self.response_file):
+            response_parsed = self.load_response()
+            logging.info("Loaded existing response file")
+        else:
+            accessions = self.parse_accessions(filepath, accession_type=accession_type)
+            response = self.metadata_getter.get_metadata(
+                accessions,
+                accession_type=accession_type,
+                fields=("fastq_ftp", "fastq_md5", "tax_id"),
+                tries=1,
+            )
+            parsed_metadata = self.metadata_getter.parse_metadata(response)
+            response_parsed = {}
+            for row in parsed_metadata:
+                obj = ENAObject(
+                    row["run_accession"], row["fastq_ftp"], row["fastq_md5"]
+                )
+                response_parsed[obj.key] = obj
+            self.write_response_file(response_parsed)
+            logging.info("Parsed metadata into response file")
+        return response_parsed
 
     def wget(self, url, filename, tries=0):
         print(f"Downloading {filename}")
