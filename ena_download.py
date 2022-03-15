@@ -208,7 +208,7 @@ class ENADownloader:
         ftp_links = row["fastq_ftp"].split(";")
         md5s = row["fastq_md5"].split(";")
         if len(md5s) != len(ftp_links):
-            raise self.InvalidRow
+            raise self.InvalidRow("The number of FTP URLs does not match the number of MD5 checksums")
         rows = []
         for f, m in zip(ftp_links, md5s):
             new_row = row.copy()
