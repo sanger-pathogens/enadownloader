@@ -59,6 +59,9 @@ class ENAObject:
 
 
 class ENADownloader:
+    class InvalidRow(ValueError):
+        pass
+
     def __init__(
         self,
         input_file: str,
@@ -200,9 +203,6 @@ class ENADownloader:
             writer.writeheader()
             for row in parsed_metadata:
                 writer.writerow(row)
-
-    class InvalidRow(ValueError):
-        pass
 
     def flatten_multivalued_ftp_attrs(self, row):
         if "fastq_ftp" in row and not row["fastq_ftp"].strip():
