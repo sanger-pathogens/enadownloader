@@ -399,6 +399,7 @@ class Parser:
             "-i",
             "--input",
             required=True,
+            type=cls.validate_input,
             help="Path to file containing ENA accessions",
         )
         parser.add_argument(
@@ -440,6 +441,13 @@ class Parser:
             args.log_level = logging.WARN
 
         return args
+
+    @staticmethod
+    def validate_input(filepath: str):
+        filepath = Path(filepath)
+        if not filepath.is_file():
+            raise argparse.ArgumentTypeError(f"input file of accessions does not exist or is not a file: {filepath}")
+        return filepath.resolve()
 
     @staticmethod
     def validate_dir(path: str):
