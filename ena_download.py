@@ -193,7 +193,7 @@ class ENADownloader:
 
     def write_metadata_file(self, parsed_metadata, output_file="metadata.tsv"):
         csv.register_dialect("unix-tab", delimiter="\t")
-        fieldnames = parsed_metadata[0].keys()  # TODO Can we rely on the order of this?
+        fieldnames = sorted(parsed_metadata[0].keys())
 
         with open(output_file, "w") as f:
             writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
