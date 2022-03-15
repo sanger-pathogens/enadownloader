@@ -79,10 +79,10 @@ class ENADownloader:
 
     def validate_accession(self, accession, accession_type):
         if accession_type == "run":
-            if not accession.startswith(("SRR","ERR","DRR")):
+            if not accession.startswith(("SRR", "ERR", "DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
         elif accession_type == "study":
-            if not accession.startswith(("SRP","ERP","DRP","PRJ")):
+            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
                 raise ValueError(f"Invalid study accession: {accession}")
         else:
             raise ValueError(f"Invalid accession_type: {accession_type}")
@@ -141,7 +141,9 @@ class ENADownloader:
         except requests.HTTPError as err:
             if tries <= self.retries:
                 sleeptime = 2**tries
-                logging.warning("Download failed, retrying after {sleeptime} seconds... Reason: {err}")
+                logging.warning(
+                    "Download failed, retrying after {sleeptime} seconds... Reason: {err}"
+                )
                 sleep(sleeptime)
                 self.get_metadata(accessions, accession_type, fields, tries + 1)
             else:
@@ -208,7 +210,9 @@ class ENADownloader:
         ftp_links = row["fastq_ftp"].split(";")
         md5s = row["fastq_md5"].split(";")
         if len(md5s) != len(ftp_links):
-            raise self.InvalidRow("The number of FTP URLs does not match the number of MD5 checksums")
+            raise self.InvalidRow(
+                "The number of FTP URLs does not match the number of MD5 checksums"
+            )
         rows = []
         for f, m in zip(ftp_links, md5s):
             new_row = row.copy()
