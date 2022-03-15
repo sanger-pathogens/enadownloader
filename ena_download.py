@@ -111,7 +111,7 @@ class ENADownloader:
                 f"Could not get available fields for ENA result type: {result_type}"
             )
             exit(1)
-        fields = [entry["columnId"] for entry in json.loads(response.text)]
+        fields = [entry["columnId"] for entry in response.json()]
         return fields
 
     def get_metadata(
