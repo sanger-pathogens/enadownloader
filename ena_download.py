@@ -97,8 +97,8 @@ class ENADownloader:
                 accession = line.strip()
                 try:
                     self.validate_accession(accession, accession_type)
-                except ValueError:
-                    logging.warning(f"Skipping invalid run accession: {accession}")
+                except ValueError as err:
+                    logging.warning(f"{err}. Skipping...")
                     continue
                 accessions.add(accession)
         return accessions
@@ -109,9 +109,9 @@ class ENADownloader:
         response = requests.get(url)
         try:
             response.raise_for_status()
-        except requests.HTTPError:
+        except requests.HTTPError as err:
             logging.error(
-                f"Could not get available fields for ENA result type: {result_type}"
+                f"Could not get available fields for ENA result type: {result_type}. Reason: {err}."
             )
             exit(1)
         fields = [entry["columnId"] for entry in response.json()]
@@ -145,12 +145,12 @@ class ENADownloader:
             if tries <= self.retries:
                 sleeptime = 2**tries
                 logging.warning(
-                    "Download failed, retrying after {sleeptime} seconds... Reason: {err}"
+                    f"Download of metadata failed. Reason: {err}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
                 self.get_metadata(accessions, accession_type, fields, tries + 1)
             else:
-                logging.error(f"Failed to retrieve metadata (tried {tries} times)")
+                logging.error(f"Failed to download metadata (tried {tries} times)")
                 exit(1)
         else:
             return response
@@ -164,7 +164,7 @@ class ENADownloader:
                 new_rows = self.flatten_multivalued_ftp_attrs(row)
             except self.InvalidRow as err:
                 logging.warning(
-                    f"Found invalid metadata for run accession {row['run_accession']}, reason: {err} - Skipping."
+                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
                 )
                 continue
             for new_row in new_rows:
@@ -226,11 +226,12 @@ class ENADownloader:
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.HTTPError:
-            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}")
+        except requests.HTTPError as err:
+            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}. Reason: {err}.")
             exit(1)
-        root = xmltodict.parse(response.content.strip())
-        return root["TAXON_SET"]
+        else:
+            root = xmltodict.parse(response.content.strip())
+            return root["TAXON_SET"]
 
     def get_scientific_name(self, taxonomy):
         return taxonomy["taxon"]["@scientificName"]
@@ -256,7 +257,7 @@ class ENADownloader:
             if tries <= self.retries:
                 sleeptime = 2**tries
                 print(
-                    f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
+                    f"Download of {filename} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
