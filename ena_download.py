@@ -67,6 +67,7 @@ class ENADownloader:
         input_file: str,
         accession_type: str,
         threads: int,
+        metadata_file: str,
         output_dir: Path,
         retries: int = 5,
     ):
@@ -74,6 +75,7 @@ class ENADownloader:
         self.input_filename = splitext(basename(input_file))[0]
         self.accession_type = accession_type
         self.threads = threads
+        self.metadata_file = metadata_file
         self.output_dir = output_dir
         self.retries = retries
 
@@ -194,11 +196,11 @@ class ENADownloader:
             logging.info("Parsed metadata into response file")
         return response_parsed
 
-    def write_metadata_file(self, parsed_metadata, output_file="metadata.tsv"):
+    def write_metadata_file(self, parsed_metadata):
         csv.register_dialect("unix-tab", delimiter="\t")
         fieldnames = sorted(parsed_metadata[0].keys())
 
-        with open(output_file, "w") as f:
+        with open(self.metadata_file, "w") as f:
             writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
             writer.writeheader()
             for row in parsed_metadata:
@@ -476,6 +478,7 @@ if __name__ == "__main__":
         input_file=args.input,
         accession_type=args.type,
         threads=args.threads,
+        metadata_file="metadata.tsv",
         output_dir=args.output_dir,
     )
     enadownloader.download_project_fastqs()
