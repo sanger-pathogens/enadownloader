@@ -7,7 +7,6 @@ import argparse
 import csv
 import hashlib
 import io
-import json
 import logging
 import multiprocessing as mp
 import os
@@ -17,7 +16,6 @@ import urllib.request as urlrequest
 from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
-import re
 from time import sleep
 from urllib.error import URLError
 
@@ -487,10 +485,12 @@ if __name__ == "__main__":
     # enadownloader = ENADownloader(
     #     accession="nonsense", threads=2, output_dir="output_dir"
     # )
-    # # metadata = enadownloader.download_run_metadata()
-    # # enadownloader.write_metadata_file(metadata)
-    # # for row in metadata:
-    # #     print(row['tax_id'])
+    # accessions = enadownloader.parse_accessions("sra_ids_test.txt")
+    # metadata = enadownloader.get_metadata(accessions)
+    # parsed_metadata = enadownloader.parse_metadata(metadata)
+    # enadownloader.write_metadata_file(parsed_metadata)
+    # for row in parsed_metadata:
+    #     print(row['tax_id'])
     #
     # # Note: cannot handle GEO accessions (from NCBI's Gene Expression Omnibus) e.g. "GSM4907283"
     # # enadownloader.get_metadata(["SRR9984183",
