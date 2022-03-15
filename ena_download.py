@@ -162,9 +162,9 @@ class ENADownloader:
         for row in reader:
             try:
                 new_rows = self.flatten_multivalued_ftp_attrs(row)
-            except self.InvalidRow:
+            except self.InvalidRow as err:
                 logging.warning(
-                    f"Found invalid metadata for run accession {row['run_accession']} - Skipping."
+                    f"Found invalid metadata for run accession {row['run_accession']}, reason: {err} - Skipping."
                 )
                 continue
             for new_row in new_rows:
