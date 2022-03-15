@@ -95,7 +95,6 @@ class ENADownloader:
                 try:
                     self.validate_accession(accession, accession_type)
                 except ValueError:
-                    # TODO Should we log warning or error. Skip accession or bail out?
                     logging.warning(f"Skipping invalid run accession: {accession}")
                     continue
                 accessions.add(accession)
