@@ -181,7 +181,7 @@ class ENADownloader:
                 accessions,
                 accession_type=accession_type,
                 fields=("fastq_ftp", "fastq_md5", "tax_id"),
-                retries=1,
+                tries=1,
             )
             parsed_metadata = self.parse_metadata(response)
             response_parsed = {}
