@@ -13,6 +13,7 @@ import os
 import shutil
 from typing import Iterable
 import urllib.request as urlrequest
+import uuid
 from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
@@ -190,23 +191,21 @@ class ENAMetadata:
 class ENADownloader:
     def __init__(
         self,
-        input_file: str,
+        accessions: Iterable,
         accession_type: str,
         threads: int,
-        metadata_file: str,
         output_dir: Path,
         retries: int = 5,
     ):
-        self.input_file = input_file
-        self.input_filename = splitext(basename(input_file))[0]
-        self.accessions_type = accession_type
+        self.accessions = accessions
+        self.accession_type = accession_type
         self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
         self.metadata_getter = ENAMetadata(self.output_dir, "metadata.tsv", self.retries)
 
-        self.response_file = join(output_dir, f".{self.input_filename}.csv")
-        self.progress_file = join(output_dir, f".{self.input_filename}.progress.csv")
+        self.response_file = join(output_dir, f".{uuid.uuid4()}.csv")
+        self.progress_file = join(output_dir, f".{uuid.uuid4()}.progress.csv")
 
     def validate_accession(self, accession, accession_type):
         if accession_type == "run":
@@ -218,29 +217,28 @@ class ENADownloader:
         else:
             raise ValueError(f"Invalid accession_type: {accession_type}")
 
-    def parse_accessions(self, filepath, accession_type="run"):
-        accessions = set()
-        with open(filepath) as f:
-            for line in f:
-                accession = line.strip()
-                try:
-                    self.validate_accession(accession, accession_type)
-                except ValueError as err:
-                    logging.warning(f"{err}. Skipping...")
-                    continue
-                accessions.add(accession)
-        return accessions
+    def parse_accessions(self, accessions, accession_type="run"):
+        parsed_accessions = []
+        for accession in accessions:
+            try:
+                self.validate_accession(accession, accession_type)
+            except ValueError as err:
+                logging.warning(f"{err}. Skipping...")
+                continue
+            else:
+                parsed_accessions.append(accession)
+        return parsed_accessions
 
-    def get_ftp_paths(self, filepath, accession_type="run"):
+    def get_ftp_paths(self):
         if exists(self.response_file):
             response_parsed = self.load_response()
             logging.info("Loaded existing response file")
         else:
-            accessions = self.parse_accessions(filepath, accession_type=accession_type)
+            accessions = self.parse_accessions(self.accessions, accession_type=self.accession_type)
             response = self.metadata_getter.get_metadata(
                 accessions,
-                accession_type=accession_type,
-                fields=("fastq_ftp", "fastq_md5", "tax_id"),
+                accession_type=self.accession_type,
+                fields=("fastq_ftp", "fastq_md5"),
                 tries=1,
             )
             parsed_metadata = self.metadata_getter.parse_metadata(response)
@@ -364,9 +362,7 @@ class ENADownloader:
         queue.put(ena)
 
     def download_project_fastqs(self):
-        response = self.get_ftp_paths(
-            self.input_file, accession_type=self.accession_type
-        )
+        response = self.get_ftp_paths()
 
         number_of_threads = self.threads
         manager = mp.Manager()
@@ -488,11 +484,16 @@ if __name__ == "__main__":
         handlers=[fh, sh],
     )
 
+    with open(args.input) as f:
+        accessions = set()
+        for line in f:
+            accession = line.strip()
+            accessions.add(accession)
+
     enadownloader = ENADownloader(
-        input_file=args.input,
+        accessions=accessions,
         accession_type=args.type,
         threads=args.threads,
-        metadata_file="metadata.tsv",
         output_dir=args.output_dir,
     )
     enadownloader.download_project_fastqs()
