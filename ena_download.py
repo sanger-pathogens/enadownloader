@@ -167,7 +167,9 @@ class ENAMetadata:
             response = requests.get(url)
             response.raise_for_status()
         except requests.HTTPError as err:
-            logging.error(f"Could not get taxonomy information for taxon id {taxon_id}. Reason: {err}.")
+            logging.error(
+                f"Could not get taxonomy information for taxon id {taxon_id}. Reason: {err}."
+            )
             exit(1)
         else:
             root = xmltodict.parse(response.content.strip())
@@ -202,7 +204,9 @@ class ENADownloader:
         self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
-        self.metadata_getter = ENAMetadata(self.output_dir, "metadata.tsv", self.retries)
+        self.metadata_getter = ENAMetadata(
+            self.output_dir, "metadata.tsv", self.retries
+        )
 
         self.response_file = join(output_dir, f".{uuid.uuid4()}.csv")
         self.progress_file = join(output_dir, f".{uuid.uuid4()}.progress.csv")
@@ -234,7 +238,9 @@ class ENADownloader:
             response_parsed = self.load_response()
             logging.info("Loaded existing response file")
         else:
-            accessions = self.parse_accessions(self.accessions, accession_type=self.accession_type)
+            accessions = self.parse_accessions(
+                self.accessions, accession_type=self.accession_type
+            )
             response = self.metadata_getter.get_metadata(
                 accessions,
                 accession_type=self.accession_type,
@@ -442,7 +448,9 @@ class Parser:
     def validate_input(filepath: str):
         filepath = Path(filepath)
         if not filepath.is_file():
-            raise argparse.ArgumentTypeError(f"input file of accessions does not exist or is not a file: {filepath}")
+            raise argparse.ArgumentTypeError(
+                f"input file of accessions does not exist or is not a file: {filepath}"
+            )
         return filepath.resolve()
 
     @staticmethod
