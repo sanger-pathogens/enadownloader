@@ -262,7 +262,7 @@ class Parser:
             return retries
         else:
             raise argparse.ArgumentTypeError(
-                f"invalid int value (must be positive): {retries!r}"
+                f"invalid int value (must be nonnegative): {retries!r}"
             )
 
 
