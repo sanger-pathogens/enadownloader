@@ -29,6 +29,9 @@ class ENAObject:
     def __init__(
         self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
     ):
+        if not all([run_accession.strip(), ftp.strip(), md5.strip()]):
+            raise ValueError("Values can not be empty")
+
         self.run_accession = run_accession
         self.ftp = ftp
         self.md5 = md5
