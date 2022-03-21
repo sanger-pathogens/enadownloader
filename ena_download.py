@@ -131,6 +131,21 @@ class ENAMetadata:
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
         return list(reader)
 
+    def filter_metadata(self, metadata, fields=None):
+        filtered_metadata = []
+        if fields is None:
+            fields = []
+        for row in metadata:
+            try:
+                new_row = {field: row[field] for field in fields}
+            except KeyError as err:
+                raise ValueError(
+                    f"Invalid field in given fields: {err.args[0]}"
+                ) from None
+            else:
+                filtered_metadata.append(new_row)
+        return filtered_metadata
+
     def write_metadata_file(self, parsed_metadata):
         csv.register_dialect("unix-tab", delimiter="\t")
         fieldnames = sorted(parsed_metadata[0].keys())
