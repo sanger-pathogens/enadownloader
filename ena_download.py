@@ -168,9 +168,10 @@ class ENAMetadata:
     def _validate_columns(self, columns):
         if self.metadata is None:
             self.get_metadata()
+        available_columns = self.metadata[0].keys()
         if columns is None:
-            columns = sorted(self.metadata[0].keys())
-        invalid_columns = set(columns).difference(self.metadata[0].keys())
+            columns = sorted(available_columns)
+        invalid_columns = set(columns).difference(available_columns)
         if invalid_columns:
             raise ValueError(f"Columns not available: {sorted(invalid_columns)}")
         return columns
@@ -183,7 +184,7 @@ class ENAMetadata:
         csv.register_dialect("unix-tab", delimiter="\t")
 
         with open(output_path, "w") as f:
-            writer = csv.DictWriter(f, columns, dialect="unix-tab")
+            writer = csv.DictWriter(f, columns, extrasaction='ignore', dialect="unix-tab")
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
@@ -560,6 +561,7 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
+    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True, columns=["run_accession", "altitude", "fastq_ftp", "fastq_md5"])
 
     enadownloader = ENADownloader(
         accessions=accessions,
