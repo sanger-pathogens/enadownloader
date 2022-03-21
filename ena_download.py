@@ -64,14 +64,10 @@ class ENAMetadata:
         self,
         accessions: Iterable,
         accession_type: str,
-        output_dir: Path,
-        metadata_filename: str,
         retries: int = 5,
     ):
         self.accessions = accessions
         self.accession_type = accession_type
-        self.output_dir = output_dir
-        self.metadata_file = output_dir / metadata_filename
         self.retries = retries
 
     def get_available_fields(self):
@@ -146,11 +142,30 @@ class ENAMetadata:
                 filtered_metadata.append(new_row)
         return filtered_metadata
 
-    def write_metadata_file(self, parsed_metadata):
+    @staticmethod
+    def _validate_output_path(output_path, overwrite):
+        output_path = Path(output_path).resolve()
+        if output_path.exists():
+            if not overwrite:
+                raise ValueError(
+                    "Output filepath already exists and overwrite is set to False"
+                )
+            elif output_path.is_dir():
+                # TODO: Should we let python's `open` cover this case - fail to open dir for writing?
+                raise ValueError(f"Cannot overwrite existing directory: {output_path}")
+            else:
+                # TODO: Should we create non-existing parent dirs?
+                os.makedirs(output_path.parent, exist_ok=True)
+        return output_path
+
+    def write_metadata_file(
+        self, parsed_metadata, output: str, overwrite: bool = False
+    ):
+        output_path = ENAMetadata._validate_output_path(output, overwrite)
         csv.register_dialect("unix-tab", delimiter="\t")
         fieldnames = sorted(parsed_metadata[0].keys())
 
-        with open(self.metadata_file, "w") as f:
+        with open(output_path, "w") as f:
             writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
             writer.writeheader()
             for row in parsed_metadata:
@@ -529,12 +544,7 @@ if __name__ == "__main__":
             accession = line.strip()
             accessions.add(accession)
 
-    enametadata = ENAMetadata(
-        accessions=accessions,
-        accession_type=args.type,
-        output_dir=args.output_dir,
-        metadata_filename="metadata.tsv",
-    )
+    enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
 
     enadownloader = ENADownloader(
         accessions=accessions,
