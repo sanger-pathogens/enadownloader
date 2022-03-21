@@ -165,15 +165,25 @@ class ENAMetadata:
                 os.makedirs(output_path.parent, exist_ok=True)
         return output_path
 
+    def _validate_columns(self, columns):
+        if self.metadata is None:
+            self.get_metadata()
+        if columns is None:
+            columns = sorted(self.metadata[0].keys())
+        invalid_columns = set(columns).difference(self.metadata[0].keys())
+        if invalid_columns:
+            raise ValueError(f"Columns not available: {sorted(invalid_columns)}")
+        return columns
+
     def write_metadata_file(
-        self, output: str, overwrite: bool = False
+        self, output: str, overwrite: bool = False, columns: Iterable[str] = None
     ):
         output_path = ENAMetadata._validate_output_path(output, overwrite)
+        columns = self._validate_columns(columns)
         csv.register_dialect("unix-tab", delimiter="\t")
-        fieldnames = sorted(self.metadata[0].keys())
 
         with open(output_path, "w") as f:
-            writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
+            writer = csv.DictWriter(f, columns, dialect="unix-tab")
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
