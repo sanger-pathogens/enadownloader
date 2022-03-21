@@ -269,7 +269,7 @@ class ENADownloader:
         return response_parsed
 
     def wget(self, url, filename, tries=0):
-        print(f"Downloading {filename}")
+        print(f"Downloading {basename(filename)}")
 
         try:
             with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
