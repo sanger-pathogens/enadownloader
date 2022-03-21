@@ -69,6 +69,7 @@ class ENAMetadata:
         self.accessions = accessions
         self.accession_type = accession_type
         self.retries = retries
+        self.metadata = None
 
     def get_available_fields(self):
         result_type = "read_run"
@@ -84,7 +85,12 @@ class ENAMetadata:
         fields = [entry["columnId"] for entry in response.json()]
         return fields
 
-    def get_metadata(
+    def get_metadata(self):
+        response = self._get_metadata()
+        parsed_metadata = self._parse_metadata(response)
+        self.metadata = parsed_metadata
+
+    def _get_metadata(
         self,
         fields: Iterable[str] = None,
         tries: int = 0,
@@ -113,14 +119,14 @@ class ENAMetadata:
                     f"Download of metadata failed. Reason: {err}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
-                self.get_metadata(fields, tries + 1)
+                self._get_metadata(fields, tries + 1)
             else:
                 logging.error(f"Failed to download metadata (tried {tries} times)")
                 exit(1)
         else:
             return response
 
-    def parse_metadata(self, response):
+    def _parse_metadata(self, response):
         csv.register_dialect("unix-tab", delimiter="\t")
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
         return list(reader)
@@ -285,11 +291,9 @@ class ENADownloader:
                 self.accessions, accession_type=self.accession_type
             )
             self.metadata_obj.accessions = accessions
-            response = self.metadata_obj.get_metadata(
-                fields=("fastq_ftp", "fastq_md5")
-            )
-            parsed_metadata = self.metadata_obj.parse_metadata(response)
-            ftp_metadata = self.get_ftp_metadata(parsed_metadata)
+            self.metadata_obj.get_metadata()
+            filtered_metadata = self.metadata_obj.filter_metadata(self.metadata_obj.metadata, fields=("run_accession", "fastq_ftp", "fastq_md5"))
+            ftp_metadata = self.get_ftp_metadata(filtered_metadata)
             response_parsed = {}
             for row in ftp_metadata:
                 obj = ENAObject(
