@@ -60,7 +60,14 @@ class ENAObject:
 
 
 class ENAMetadata:
-    def __init__(self, accessions: Iterable, accession_type: str, output_dir: Path, metadata_filename: str, retries: int = 5):
+    def __init__(
+        self,
+        accessions: Iterable,
+        accession_type: str,
+        output_dir: Path,
+        metadata_filename: str,
+        retries: int = 5,
+    ):
         self.accessions = accessions
         self.accession_type = accession_type
         self.output_dir = output_dir
@@ -223,7 +230,6 @@ class ENADownloader:
             for new_row in new_rows:
                 parsed_metadata.append(new_row)
         return parsed_metadata
-
 
     def flatten_multivalued_ftp_attrs(self, row):
         if "fastq_ftp" in row and not row["fastq_ftp"].strip():
@@ -512,7 +518,7 @@ if __name__ == "__main__":
         accessions=accessions,
         accession_type=args.type,
         output_dir=args.output_dir,
-        metadata_filename="metadata.tsv"
+        metadata_filename="metadata.tsv",
     )
 
     enadownloader = ENADownloader(
@@ -521,7 +527,7 @@ if __name__ == "__main__":
         threads=args.threads,
         output_dir=args.output_dir,
         metadata_obj=enametadata,
-        project_id="PROJECT_ID"
+        project_id="PROJECT_ID",
     )
     enadownloader.download_project_fastqs()
 
@@ -566,3 +572,16 @@ if __name__ == "__main__":
     # response2 = enadownloader.get_metadata(["PRJDB4356"], accession_type="study", fields=("fastq_ftp", "fastq_md5", "tax_id"), retries=1)
     # parsed_metadata2 = enadownloader.parse_metadata(response2)
     # print(parsed_metadata2)
+
+    # em = ENAMetadata('.', "metadata.tsv", 5)
+    # response = em.get_metadata(["SRR9984183",
+    #                 "SRR13191702",
+    #                 "ERR1160846",
+    #                 "ERR1109373",
+    #                 "DRR028935",
+    #                 "DRR026872",
+    #                 "SRR12848126",
+    #                 "SRR14593545",
+    #                 "SRR14709033",])
+    # parsed_metadata = em.parse_metadata(response)
+    # em.filter_metadata(parsed_metadata)
