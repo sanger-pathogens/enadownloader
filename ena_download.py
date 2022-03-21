@@ -131,11 +131,13 @@ class ENAMetadata:
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
         return list(reader)
 
-    def filter_metadata(self, metadata, fields=None):
+    def filter_metadata(self, fields=None):
         filtered_metadata = []
+        if self.metadata is None:
+            self.get_metadata()
         if fields is None:
             fields = []
-        for row in metadata:
+        for row in self.metadata:
             try:
                 new_row = {field: row[field] for field in fields}
             except KeyError as err:
@@ -292,7 +294,7 @@ class ENADownloader:
             )
             self.metadata_obj.accessions = accessions
             self.metadata_obj.get_metadata()
-            filtered_metadata = self.metadata_obj.filter_metadata(self.metadata_obj.metadata, fields=("run_accession", "fastq_ftp", "fastq_md5"))
+            filtered_metadata = self.metadata_obj.filter_metadata(fields=("run_accession", "fastq_ftp", "fastq_md5"))
             ftp_metadata = self.get_ftp_metadata(filtered_metadata)
             response_parsed = {}
             for row in ftp_metadata:
