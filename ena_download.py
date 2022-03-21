@@ -86,8 +86,6 @@ class ENAMetadata:
 
     def get_metadata(
         self,
-        accessions: Iterable[str],
-        accession_type: str = "run",
         fields: Iterable[str] = None,
         tries: int = 0,
     ) -> requests.Response:
@@ -100,8 +98,8 @@ class ENAMetadata:
             "https://www.ebi.ac.uk/ena/portal/api/search?"
             "result=read_run"
             f"&fields={','.join(fields)}"
-            f"&includeAccessionType={accession_type}"
-            f"&includeAccessions={','.join(accessions)}"
+            f"&includeAccessionType={self.accession_type}"
+            f"&includeAccessions={','.join(self.accessions)}"
             f"&limit=0"
             f"&format=tsv"
         )
@@ -115,7 +113,7 @@ class ENAMetadata:
                     f"Download of metadata failed. Reason: {err}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
-                self.get_metadata(accessions, accession_type, fields, tries + 1)
+                self.get_metadata(fields, tries + 1)
             else:
                 logging.error(f"Failed to download metadata (tried {tries} times)")
                 exit(1)
@@ -286,11 +284,9 @@ class ENADownloader:
             accessions = self.parse_accessions(
                 self.accessions, accession_type=self.accession_type
             )
+            self.metadata_obj.accessions = accessions
             response = self.metadata_obj.get_metadata(
-                accessions,
-                accession_type=self.accession_type,
-                fields=("fastq_ftp", "fastq_md5"),
-                tries=1,
+                fields=("fastq_ftp", "fastq_md5")
             )
             parsed_metadata = self.metadata_obj.parse_metadata(response)
             ftp_metadata = self.get_ftp_metadata(parsed_metadata)
