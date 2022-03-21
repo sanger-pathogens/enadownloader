@@ -13,7 +13,6 @@ import os
 import shutil
 from typing import Iterable
 import urllib.request as urlrequest
-import uuid
 from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
@@ -58,10 +57,9 @@ class ENAObject:
 
 
 class ENAMetadata:
-    class InvalidRow(ValueError):
-        pass
-
-    def __init__(self, output_dir: Path, metadata_filename: str, retries: int):
+    def __init__(self, accessions: Iterable, accession_type: str, output_dir: Path, metadata_filename: str, retries: int = 5):
+        self.accessions = accessions
+        self.accession_type = accession_type
         self.output_dir = output_dir
         self.metadata_file = output_dir / metadata_filename
         self.retries = retries
@@ -118,38 +116,10 @@ class ENAMetadata:
         else:
             return response
 
-    def flatten_multivalued_ftp_attrs(self, row):
-        if "fastq_ftp" in row and not row["fastq_ftp"].strip():
-            raise self.InvalidRow("No FTP URL was found")
-        ftp_links = row["fastq_ftp"].split(";")
-        md5s = row["fastq_md5"].split(";")
-        if len(md5s) != len(ftp_links):
-            raise self.InvalidRow(
-                "The number of FTP URLs does not match the number of MD5 checksums"
-            )
-        rows = []
-        for f, m in zip(ftp_links, md5s):
-            new_row = row.copy()
-            new_row["fastq_ftp"] = f
-            new_row["fastq_md5"] = m
-            rows.append(new_row)
-        return rows
-
     def parse_metadata(self, response):
-        parsed_metadata = []
         csv.register_dialect("unix-tab", delimiter="\t")
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
-        for row in reader:
-            try:
-                new_rows = self.flatten_multivalued_ftp_attrs(row)
-            except self.InvalidRow as err:
-                logging.warning(
-                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
-                )
-                continue
-            for new_row in new_rows:
-                parsed_metadata.append(new_row)
-        return parsed_metadata
+        return list(reader)
 
     def write_metadata_file(self, parsed_metadata):
         csv.register_dialect("unix-tab", delimiter="\t")
@@ -191,12 +161,17 @@ class ENAMetadata:
 
 
 class ENADownloader:
+    class InvalidRow(ValueError):
+        pass
+
     def __init__(
         self,
         accessions: Iterable,
         accession_type: str,
         threads: int,
         output_dir: Path,
+        project_id: str,
+        metadata_obj: ENAMetadata,
         retries: int = 5,
     ):
         self.accessions = accessions
@@ -204,12 +179,11 @@ class ENADownloader:
         self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
-        self.metadata_getter = ENAMetadata(
-            self.output_dir, "metadata.tsv", self.retries
-        )
+        self.metadata_obj = metadata_obj
+        self.project_id = project_id
 
-        self.response_file = join(output_dir, f".{uuid.uuid4()}.csv")
-        self.progress_file = join(output_dir, f".{uuid.uuid4()}.progress.csv")
+        self.response_file = join(output_dir, f".{project_id}.csv")
+        self.progress_file = join(output_dir, f".{project_id}.progress.csv")
 
     def validate_accession(self, accession, accession_type):
         if accession_type == "run":
@@ -233,6 +207,38 @@ class ENADownloader:
                 parsed_accessions.append(accession)
         return parsed_accessions
 
+    def get_ftp_metadata(self, metadata):
+        parsed_metadata = []
+        for row in metadata:
+            try:
+                new_rows = self.flatten_multivalued_ftp_attrs(row)
+            except self.InvalidRow as err:
+                logging.warning(
+                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
+                )
+                continue
+            for new_row in new_rows:
+                parsed_metadata.append(new_row)
+        return parsed_metadata
+
+
+    def flatten_multivalued_ftp_attrs(self, row):
+        if "fastq_ftp" in row and not row["fastq_ftp"].strip():
+            raise self.InvalidRow("No FTP URL was found")
+        ftp_links = row["fastq_ftp"].split(";")
+        md5s = row["fastq_md5"].split(";")
+        if len(md5s) != len(ftp_links):
+            raise self.InvalidRow(
+                "The number of FTP URLs does not match the number of MD5 checksums"
+            )
+        rows = []
+        for f, m in zip(ftp_links, md5s):
+            new_row = row.copy()
+            new_row["fastq_ftp"] = f
+            new_row["fastq_md5"] = m
+            rows.append(new_row)
+        return rows
+
     def get_ftp_paths(self):
         if exists(self.response_file):
             response_parsed = self.load_response()
@@ -241,15 +247,16 @@ class ENADownloader:
             accessions = self.parse_accessions(
                 self.accessions, accession_type=self.accession_type
             )
-            response = self.metadata_getter.get_metadata(
+            response = self.metadata_obj.get_metadata(
                 accessions,
                 accession_type=self.accession_type,
                 fields=("fastq_ftp", "fastq_md5"),
                 tries=1,
             )
-            parsed_metadata = self.metadata_getter.parse_metadata(response)
+            parsed_metadata = self.metadata_obj.parse_metadata(response)
+            ftp_metadata = self.get_ftp_metadata(parsed_metadata)
             response_parsed = {}
-            for row in parsed_metadata:
+            for row in ftp_metadata:
                 obj = ENAObject(
                     row["run_accession"], row["fastq_ftp"], row["fastq_md5"]
                 )
@@ -498,11 +505,20 @@ if __name__ == "__main__":
             accession = line.strip()
             accessions.add(accession)
 
+    enametadata = ENAMetadata(
+        accessions=accessions,
+        accession_type=args.type,
+        output_dir=args.output_dir,
+        metadata_filename="metadata.tsv"
+    )
+
     enadownloader = ENADownloader(
         accessions=accessions,
         accession_type=args.type,
         threads=args.threads,
         output_dir=args.output_dir,
+        metadata_obj=enametadata,
+        project_id="PROJECT_ID"
     )
     enadownloader.download_project_fastqs()
 
