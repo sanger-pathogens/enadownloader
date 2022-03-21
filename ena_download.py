@@ -71,8 +71,7 @@ class ENAMetadata:
         self.retries = retries
         self.metadata = None
 
-    def get_available_fields(self):
-        result_type = "read_run"
+    def get_available_fields(self, result_type: str = "read_run"):
         url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
         response = requests.get(url)
         try:
