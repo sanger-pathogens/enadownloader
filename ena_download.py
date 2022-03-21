@@ -166,16 +166,16 @@ class ENAMetadata:
         return output_path
 
     def write_metadata_file(
-        self, parsed_metadata, output: str, overwrite: bool = False
+        self, output: str, overwrite: bool = False
     ):
         output_path = ENAMetadata._validate_output_path(output, overwrite)
         csv.register_dialect("unix-tab", delimiter="\t")
-        fieldnames = sorted(parsed_metadata[0].keys())
+        fieldnames = sorted(self.metadata[0].keys())
 
         with open(output_path, "w") as f:
             writer = csv.DictWriter(f, fieldnames, dialect="unix-tab")
             writer.writeheader()
-            for row in parsed_metadata:
+            for row in self.metadata:
                 writer.writerow(row)
 
     def get_taxonomy(self, taxon_id):
