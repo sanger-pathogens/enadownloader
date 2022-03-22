@@ -29,18 +29,62 @@ class ENAObject:
     def __init__(
         self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
     ):
-        if not (run_accession or run_accession.strip()):
-            raise ValueError("run_accession cannot be None or empty")
-        if not (ftp or ftp.strip()):
-            raise ValueError("ftp cannot be None or empty")
-        if not (md5 or md5.strip()):
-            raise ValueError("md5 cannot be None or empty")
-
         self.run_accession = run_accession
         self.ftp = ftp
         self.md5 = md5
         self.md5_passed = md5_passed
         self.key = splitext(basename(ftp))[0]
+
+    @property
+    def run_accession(self):
+        return self._run_accession
+
+    @run_accession.setter
+    def run_accession(self, value):
+        if value is None:
+            raise ValueError("run_accession cannot be None")
+        try:
+            value = value.strip()
+        except ValueError:
+            raise ValueError("run_accession must be a str")
+        else:
+            if not value:
+                raise ValueError("run_accession must not be an empty str")
+        self._run_accession = value
+
+    @property
+    def ftp(self):
+        return self._ftp
+
+    @ftp.setter
+    def ftp(self, value):
+        if value is None:
+            raise ValueError("ftp cannot be None")
+        try:
+            value = value.strip()
+        except ValueError:
+            raise ValueError("ftp must be a str")
+        else:
+            if not value:
+                raise ValueError("ftp must not be an empty str")
+        self._ftp = value
+
+    @property
+    def md5(self):
+        return self._md5
+
+    @md5.setter
+    def md5(self, value):
+        if value is None:
+            raise ValueError("md5 cannot be None")
+        try:
+            value = value.strip()
+        except ValueError:
+            raise ValueError("md5 must be a str")
+        else:
+            if not value:
+                raise ValueError("md5 must not be an empty str")
+        self._md5 = value
 
     @property
     def md5_passed(self):
