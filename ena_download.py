@@ -110,7 +110,7 @@ class ENAObject:
 class ENAMetadata:
     def __init__(
         self,
-        accessions: Iterable,
+        accessions: Iterable[str],
         accession_type: str,
         retries: int = 5,
     ):
