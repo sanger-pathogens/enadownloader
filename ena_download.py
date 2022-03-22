@@ -276,10 +276,13 @@ class ENAMetadata:
             raise
         return names
 
-    def to_excel(self):
+    def to_excel(self, output_dir: Path):
         """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
 
         studies = defaultdict(list)
+        if not self.metadata:
+            self.get_metadata()
+
         for row in self.metadata:
             studies[row["study_accession"]].append(row)
 
@@ -328,7 +331,7 @@ class ENAMetadata:
                 )
 
                 writer = ExcelWriter(fh, data)
-                writer.write(f"{fh.study_accession_number.value}.xls")
+                writer.write(output_dir / f"{fh.study_accession_number.value}.xls")
 
 
 class ENADownloader:
@@ -603,15 +606,28 @@ class Parser:
             "-v",
             "--verbosity",
             action="count",
-            default=0,
+            default=1,
             help="Use the option multiple times to increase output verbosity",
         )
         parser.add_argument(
             "-m",
-            "--metadata-only",
+            "--write-metadata",
             action="store_true",
-            help="Only output a metadata tsv for the given ENA accessions",
+            help="Output a metadata tsv for the given ENA accessions",
         )
+        parser.add_argument(
+            "-d",
+            "--download-files",
+            action="store_true",
+            help="Download fastq files for the given ENA accessions",
+        )
+        parser.add_argument(
+            "-e",
+            "--write-excel",
+            action="store_true",
+            help="Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project",
+        )
+
         args = parser.parse_args()
 
         # Set log_level arg
@@ -679,17 +695,21 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
-    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
-    if args.metadata_only:
-        exit(0)
 
-    enadownloader = ENADownloader(
-        accessions=accessions,
-        accession_type=args.type,
-        threads=args.threads,
-        output_dir=args.output_dir,
-        metadata_obj=enametadata,
-        project_id="PROJECT_ID",
-    )
-    # enadownloader.download_project_fastqs()
-    enametadata.to_excel()
+    if args.write_metadata:
+        enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
+
+    if args.write_excel:
+        enametadata.to_excel(args.output_dir)
+
+    if args.download_files:
+        enadownloader = ENADownloader(
+            accessions=accessions,
+            accession_type=args.type,
+            threads=args.threads,
+            output_dir=args.output_dir,
+            metadata_obj=enametadata,
+            project_id="PROJECT_ID",
+        )
+
+        enadownloader.download_project_fastqs()
