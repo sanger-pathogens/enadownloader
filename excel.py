@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from xlwt import Workbook, Worksheet, easyxf, Style
 
@@ -8,7 +8,7 @@ default = Style.default_style
 
 
 class ValueFormatClass:
-    def __init__(self, name: str, value: str, format: Style = st):
+    def __init__(self, name: str, value: Union[str, int], format: Style = st):
         self.name = name
         self.value = value
         self.format = format
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         "Ellen Higginson",
         "Illumina",
         "ParaA_Oantigen",
-        "1.5",
+        1.5,
         "01/12/2024",
     )
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
             mate_file="813_lib566602_7871_2.fastq.gz",
             sample_name="OANT813",
             sample_accession="",
-            taxon="54388",
+            taxon=54388,
             library="OANT813",
             fragment="",
             read_count="",
