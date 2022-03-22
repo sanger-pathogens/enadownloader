@@ -239,6 +239,8 @@ class ENAMetadata:
         output_path = ENAMetadata._validate_output_path(output, overwrite)
         columns = self._validate_columns(columns)
         csv.register_dialect("unix-tab", delimiter="\t")
+        if self.metadata is None:
+            self.get_metadata()
 
         with open(output_path, "w") as f:
             writer = csv.DictWriter(
