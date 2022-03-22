@@ -207,11 +207,7 @@ class ENAMetadata:
                 raise ValueError(
                     "Output filepath already exists and overwrite is set to False"
                 )
-            elif output_path.is_dir():
-                # TODO: Should we let python's `open` cover this case - fail to open dir for writing?
-                raise ValueError(f"Cannot overwrite existing directory: {output_path}")
             else:
-                # TODO: Should we create non-existing parent dirs?
                 os.makedirs(output_path.parent, exist_ok=True)
         return output_path
 
