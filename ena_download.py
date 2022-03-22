@@ -608,11 +608,7 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
-    enametadata.write_metadata_file(
-        args.output_dir / "metadata.tsv",
-        overwrite=True,
-        columns=["run_accession", "altitude", "fastq_ftp", "fastq_md5"],
-    )
+    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
 
     enadownloader = ENADownloader(
         accessions=accessions,
