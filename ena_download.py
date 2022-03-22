@@ -24,6 +24,7 @@ import xmltodict
 
 from excel import Data, ExcelWriter, FileHeader
 
+
 def strtobool(val: str):
     if val in ("y", "yes", "true", "on", "1"):
         return True
@@ -31,6 +32,7 @@ def strtobool(val: str):
         return False
     else:
         raise ValueError(f"Unrecognised value: {val}")
+
 
 class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
@@ -296,7 +298,9 @@ class ENAMetadata:
             data = []
             for row in study:
                 if not row["fastq_ftp"].strip():
-                    logging.warning(f"Can't find ftp for accession: {row['run_accession']}. Skipping.")
+                    logging.warning(
+                        f"Can't find ftp for accession: {row['run_accession']}. Skipping."
+                    )
                     continue
 
                 files = row["fastq_ftp"].split(";")
@@ -309,7 +313,9 @@ class ENAMetadata:
                         filename = basename([f for f in files if "_1" in f][0])
                         matefile = basename([f for f in files if "_2" in f][0])
                     except IndexError:
-                        logging.warning(f"Can't correctly extract filename and matefile paths from row: {row}.")
+                        logging.warning(
+                            f"Can't correctly extract filename and matefile paths from row: {row}."
+                        )
                         continue
 
                 data.append(
@@ -323,6 +329,7 @@ class ENAMetadata:
 
                 writer = ExcelWriter(fh, data)
                 writer.write(f"{fh.study_accession_number.value}.xls")
+
 
 class ENADownloader:
     class InvalidRow(ValueError):
