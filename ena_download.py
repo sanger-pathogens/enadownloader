@@ -27,7 +27,12 @@ class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-        self, run_accession: str, study_accession: str, ftp: str, md5: str, md5_passed: bool = False
+        self,
+        run_accession: str,
+        study_accession: str,
+        ftp: str,
+        md5: str,
+        md5_passed: bool = False,
     ):
         self.run_accession = run_accession
         self.study_accession = study_accession
@@ -381,7 +386,10 @@ class ENADownloader:
             response_parsed = {}
             for row in ftp_metadata:
                 obj = ENAObject(
-                    row["run_accession"], row["study_accession"], row["fastq_ftp"], row["fastq_md5"]
+                    row["run_accession"],
+                    row["study_accession"],
+                    row["fastq_ftp"],
+                    row["fastq_md5"],
                 )
                 response_parsed[obj.key] = obj
             self.write_response_file(response_parsed)
@@ -415,7 +423,12 @@ class ENADownloader:
                 keys = line
                 continue
             try:
-                run_accession, study_accession, fastq_ftp, fastq_md5 = line.strip().split()
+                (
+                    run_accession,
+                    study_accession,
+                    fastq_ftp,
+                    fastq_md5,
+                ) = line.strip().split()
             except ValueError:
                 continue
 
