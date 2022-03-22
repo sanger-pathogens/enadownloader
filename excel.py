@@ -78,7 +78,7 @@ class Data:
         self,
         filename: str,
         sample_name: str,
-        taxon: str,
+        taxon: int,
         mate_file: str = None,
         sample_accession: str = None,
         library: str = None,

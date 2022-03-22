@@ -332,7 +332,7 @@ class ENAMetadata:
                 )
 
                 writer = ExcelWriter(fh, data)
-                writer.write(output_dir / f"{fh.study_accession_number.value}.xls")
+                writer.write(str(output_dir / f"{fh.study_accession_number.value}.xls"))
 
 
 class ENADownloader:
