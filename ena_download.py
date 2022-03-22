@@ -697,7 +697,9 @@ if __name__ == "__main__":
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
 
     if args.write_metadata:
-        enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
+        enametadata.write_metadata_file(
+            args.output_dir / "metadata.tsv", overwrite=True
+        )
 
     if args.write_excel:
         enametadata.to_excel(args.output_dir)
