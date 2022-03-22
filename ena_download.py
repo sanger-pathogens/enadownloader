@@ -323,8 +323,7 @@ class ENADownloader:
                     f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
                 )
                 continue
-            for new_row in new_rows:
-                parsed_metadata.append(new_row)
+            parsed_metadata.extend(new_rows)
         return parsed_metadata
 
     def flatten_multivalued_ftp_attrs(self, row):
