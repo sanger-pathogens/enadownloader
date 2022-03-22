@@ -27,13 +27,10 @@ Check Black format:
   stage: format
   only:
     - branches
-  except:
-    - tags
   script:
     - pip install black
     - black . --check --diff --color
 
-# at every git push, build docker image and push to the container registry with the commit SHA-1 as the tag
 Branch builds:
   stage: build
   variables:

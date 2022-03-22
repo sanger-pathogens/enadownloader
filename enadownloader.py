@@ -4,9 +4,9 @@ Robust tool to download fastq.gz files and metadata from ENA
 """
 
 import argparse
+import asyncio
 import hashlib
 import logging
-import multiprocessing as mp
 import os
 import shutil
 import urllib.request as urlrequest
@@ -53,11 +53,8 @@ class ENAObject:
 
 
 class ENADownloader:
-    def __init__(
-        self, accession: str, threads: int, output_dir: Path, retries: int = 5
-    ):
+    def __init__(self, accession: str, output_dir: Path, retries: int = 5):
         self.accession = accession
-        self.threads = threads
         self.output_dir = output_dir
         self.retries = retries
 
@@ -65,7 +62,7 @@ class ENADownloader:
         self.progress_file = join(output_dir, f".{accession}.progress.csv")
 
     def wget(self, url, filename, tries=0):
-        print(f"Downloading {filename}")
+        logging.info(f"Downloading {filename}")
 
         try:
             with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -73,13 +70,15 @@ class ENADownloader:
         except URLError as err:
             if tries <= self.retries:
                 sleeptime = 2**tries
-                print(
-                    f"Download failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
+                logging.warning(
+                    f"Download of {basename(filename)} failed, retrying after {sleeptime} seconds... Reason: {err.reason}"
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
             else:
-                raise
+                # We probably don't want the program to terminate upon one failure,
+                # but give the users a unique value to search for
+                logging.warning(f"Download of {basename(filename)} failed entirely!")
 
     @staticmethod
     def parse_file_report(response: requests.Response):
@@ -136,25 +135,15 @@ class ENADownloader:
             for data in response_parsed.values():
                 fp.write(str(data) + "\n")
 
-    def listener(self, queue: mp.Queue):
+    def listener(self, m: str = None):
         if not exists(self.progress_file):
             with open(self.progress_file, "w") as f:
                 f.write(f"{ENAObject.header}\n")
 
-        with open(self.progress_file, "a") as f:
-            while True:
-                m = queue.get()
-                assert isinstance(
-                    m, (str, ENAObject)
-                ), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
-                if m == "kill":
-                    queue.task_done()
-                    break
-
-                else:
-                    f.write(str(m) + "\n")
-                    f.flush()
-                    queue.task_done()
+        if m is not None:
+            with open(self.progress_file, "a") as f:
+                f.write(str(m) + "\n")
+                f.flush()
 
     def get_ftp_paths(self, accession):
         if exists(self.response_file):
@@ -186,36 +175,27 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_fastqs(self, ena: ENAObject, queue: mp.Queue, output_dir: Path):
+    def download_fastqs(self, ena: ENAObject):
         url = "ftp://" + ena.ftp
-        outfile = output_dir / basename(ena.ftp)
+        outfile = self.output_dir / basename(ena.ftp)
         self.wget(url, outfile)
         md5_f = self.md5_check(outfile)
 
         ena.md5_passed = md5_f == ena.md5
-        queue.put(ena)
 
-    def download_project_fastqs(self):
+        self.listener(str(ena))
+
+    async def download_project_fastqs(self):
         response = self.get_ftp_paths(self.accession)
+        # Initialise file with header
+        self.listener()
 
-        number_of_threads = self.threads
-        manager = mp.Manager()
-        queue = manager.Queue()
-        with mp.Pool(processes=number_of_threads) as pool:
-            pool.apply_async(self.listener, (queue,))
-
-            res = pool.starmap_async(
-                self.download_fastqs,
-                [
-                    (item, queue, args.output_dir)
-                    for item in response.values()
-                    if not item.md5_passed
-                ],
-            )
-            res.get()
-
-            queue.put("kill")
-            queue.join()
+        to_dos = [item for item in response.values() if not item.md5_passed]
+        # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
+        # nor is there any alternative that is
+        await asyncio.gather(
+            *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
+        )
 
 
 class Parser:
@@ -239,11 +219,11 @@ class Parser:
             help="directory in which to save downloaded files",
         )
         parser.add_argument(
-            "-t",
-            "--threads",
-            default=1,
-            type=cls.validate_threads,
-            help="Number of threads to use for download",
+            "-r",
+            "--retries",
+            default=5,
+            type=cls.validate_retries,
+            help="Amount to retry each fastq file upon download interruption",
         )
         parser.add_argument(
             "-v",
@@ -273,22 +253,22 @@ class Parser:
         return Path(path).resolve()
 
     @staticmethod
-    def validate_threads(threads: str):
+    def validate_retries(retries: str):
         try:
-            threads = int(threads)
+            retries = int(retries)
         except ValueError:
-            raise argparse.ArgumentTypeError(f"invalid int value: {threads!r}")
-        if 1 < threads <= 100:
-            return threads
+            raise argparse.ArgumentTypeError(f"invalid int value: {retries!r}")
+        if retries >= 0:
+            return retries
         else:
             raise argparse.ArgumentTypeError(
-                f"invalid int value (must be between 2 and 100): {threads!r}"
+                f"invalid int value (must be nonnegative): {retries!r}"
             )
 
 
 if __name__ == "__main__":
     args = Parser.arg_parser()
-    this_file = join(args.output_dir, basename(splitext(__file__)[0]))
+    this_file = join(os.getcwd(), basename(splitext(__file__)[0]))
 
     # Set up logging
     fh = logging.FileHandler(f"{this_file}.log", mode="w")
@@ -304,6 +284,6 @@ if __name__ == "__main__":
     )
 
     enadownloader = ENADownloader(
-        accession=args.project, threads=args.threads, output_dir=args.output_dir
+        accession=args.project, output_dir=args.output_dir, retries=args.retries
     )
-    enadownloader.download_project_fastqs()
+    asyncio.run(enadownloader.download_project_fastqs())
