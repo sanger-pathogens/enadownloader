@@ -168,7 +168,9 @@ class ENAMetadata:
                     f"Download of metadata failed. Reason: {err}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
-                self._get_metadata_response(accessions, accession_type, fields, tries + 1)
+                self._get_metadata_response(
+                    accessions, accession_type, fields, tries + 1
+                )
             else:
                 logging.error(f"Failed to download metadata (tried {tries} times)")
                 exit(1)
@@ -232,7 +234,9 @@ class ENAMetadata:
         csv.register_dialect("unix-tab", delimiter="\t")
 
         with open(output_path, "w") as f:
-            writer = csv.DictWriter(f, columns, extrasaction='ignore', dialect="unix-tab")
+            writer = csv.DictWriter(
+                f, columns, extrasaction="ignore", dialect="unix-tab"
+            )
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
@@ -609,7 +613,11 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
-    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True, columns=["run_accession", "altitude", "fastq_ftp", "fastq_md5"])
+    enametadata.write_metadata_file(
+        args.output_dir / "metadata.tsv",
+        overwrite=True,
+        columns=["run_accession", "altitude", "fastq_ftp", "fastq_md5"],
+    )
 
     enadownloader = ENADownloader(
         accessions=accessions,
@@ -620,4 +628,3 @@ if __name__ == "__main__":
         project_id="PROJECT_ID",
     )
     enadownloader.download_project_fastqs()
-
