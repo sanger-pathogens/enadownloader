@@ -11,9 +11,9 @@ import logging
 import multiprocessing as mp
 import os
 import shutil
+from collections import defaultdict
 from typing import Iterable
 import urllib.request as urlrequest
-from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
 from time import sleep
@@ -21,6 +21,17 @@ from urllib.error import URLError
 
 import requests
 import xmltodict
+
+from excel import Data, ExcelWriter, FileHeader
+
+
+def strtobool(val: str):
+    if val in ("y", "yes", "true", "on", "1"):
+        return True
+    elif val in ("n", "no", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError(f"Unrecognised value: {val}")
 
 
 class ENAObject:
@@ -264,6 +275,63 @@ class ENAMetadata:
             )
             raise
         return names
+
+    def to_excel(self, output_dir: Path):
+        """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
+
+        studies = defaultdict(list)
+        if not self.metadata:
+            self.get_metadata()
+
+        for row in self.metadata:
+            studies[row["study_accession"]].append(row)
+
+        for study in studies.values():
+            fh = FileHeader(
+                "Pathogen Informatics",
+                "PaM",
+                "path-help",
+                study[0]["instrument_platform"],
+                study[0]["study_title"],
+                1,
+                "18/03/2025",
+                study[0]["study_accession"],
+            )
+
+            data = []
+            for row in study:
+                if not row["fastq_ftp"].strip():
+                    logging.warning(
+                        f"Can't find ftp for accession: {row['run_accession']}. Skipping."
+                    )
+                    continue
+
+                files = row["fastq_ftp"].split(";")
+
+                if len(files) == 1:
+                    filename = basename(files[0])
+                    matefile = None
+                else:
+                    try:
+                        filename = basename([f for f in files if "_1" in f][0])
+                        matefile = basename([f for f in files if "_2" in f][0])
+                    except IndexError:
+                        logging.warning(
+                            f"Can't correctly extract filename and matefile paths from row: {row}."
+                        )
+                        continue
+
+                data.append(
+                    Data(
+                        filename=filename,
+                        mate_file=matefile,
+                        sample_name=row["sample_accession"],
+                        taxon=int(row["tax_id"]),
+                    )
+                )
+
+                writer = ExcelWriter(fh, data)
+                writer.write(output_dir / f"{fh.study_accession_number.value}.xls")
 
 
 class ENADownloader:
@@ -538,15 +606,28 @@ class Parser:
             "-v",
             "--verbosity",
             action="count",
-            default=0,
+            default=1,
             help="Use the option multiple times to increase output verbosity",
         )
         parser.add_argument(
             "-m",
-            "--metadata-only",
+            "--write-metadata",
             action="store_true",
-            help="Only output a metadata tsv for the given ENA accessions",
+            help="Output a metadata tsv for the given ENA accessions",
         )
+        parser.add_argument(
+            "-d",
+            "--download-files",
+            action="store_true",
+            help="Download fastq files for the given ENA accessions",
+        )
+        parser.add_argument(
+            "-e",
+            "--write-excel",
+            action="store_true",
+            help="Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project",
+        )
+
         args = parser.parse_args()
 
         # Set log_level arg
@@ -614,16 +695,23 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
-    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
-    if args.metadata_only:
-        exit(0)
 
-    enadownloader = ENADownloader(
-        accessions=accessions,
-        accession_type=args.type,
-        threads=args.threads,
-        output_dir=args.output_dir,
-        metadata_obj=enametadata,
-        project_id="PROJECT_ID",
-    )
-    enadownloader.download_project_fastqs()
+    if args.write_metadata:
+        enametadata.write_metadata_file(
+            args.output_dir / "metadata.tsv", overwrite=True
+        )
+
+    if args.write_excel:
+        enametadata.to_excel(args.output_dir)
+
+    if args.download_files:
+        enadownloader = ENADownloader(
+            accessions=accessions,
+            accession_type=args.type,
+            threads=args.threads,
+            output_dir=args.output_dir,
+            metadata_obj=enametadata,
+            project_id="PROJECT_ID",
+        )
+
+        enadownloader.download_project_fastqs()
