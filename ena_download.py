@@ -381,7 +381,6 @@ class ENADownloader:
             filtered_metadata = self.metadata_obj.filter_metadata(
                 fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
             )
-            logging.error(f"KEV: {str(filtered_metadata)}")
             ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
             response_parsed = {}
             for row in ftp_metadata:
