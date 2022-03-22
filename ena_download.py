@@ -45,7 +45,7 @@ class ENAObject:
             raise ValueError("run_accession cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("run_accession must be a str")
         else:
             if not value:
@@ -62,7 +62,7 @@ class ENAObject:
             raise ValueError("ftp cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("ftp must be a str")
         else:
             if not value:
@@ -79,7 +79,7 @@ class ENAObject:
             raise ValueError("md5 cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("md5 must be a str")
         else:
             if not value:
