@@ -14,7 +14,6 @@ import shutil
 from collections import defaultdict
 from typing import Iterable
 import urllib.request as urlrequest
-from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
 from time import sleep
@@ -25,6 +24,13 @@ import xmltodict
 
 from excel import Data, ExcelWriter, FileHeader
 
+def strtobool(val: str):
+    if val in ("y", "yes", "true", "on", "1"):
+        return True
+    elif val in ("n", "no", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError(f"Unrecognised value: {val}")
 
 class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
