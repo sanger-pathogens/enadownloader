@@ -541,6 +541,12 @@ class Parser:
             default=0,
             help="Use the option multiple times to increase output verbosity",
         )
+        parser.add_argument(
+            "-m",
+            "--metadata-only",
+            action="store_true",
+            help="Only output a metadata tsv for the given ENA accessions",
+        )
         args = parser.parse_args()
 
         # Set log_level arg
@@ -609,6 +615,8 @@ if __name__ == "__main__":
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
     enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
+    if args.metadata_only:
+        exit(0)
 
     enadownloader = ENADownloader(
         accessions=accessions,
