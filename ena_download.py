@@ -236,6 +236,7 @@ class ENAMetadata:
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
+        logging.info(f"Wrote metadata to {output_path}")
 
     def get_taxonomy(self, taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
