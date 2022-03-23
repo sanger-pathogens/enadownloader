@@ -104,7 +104,9 @@ class ENAObject:
     @md5_passed.setter
     def md5_passed(self, value):
         self._md5_passed = (
-            bool(strtobool(str(value).lower())) if not isinstance(value, bool) else value
+            bool(strtobool(str(value).lower()))
+            if not isinstance(value, bool)
+            else value
         )
 
     @md5_passed.getter
@@ -694,6 +696,6 @@ if __name__ == "__main__":
             output_dir=args.output_dir,
             metadata_obj=enametadata,
             project_id="PROJECT_ID",
-            retries=args.retries
+            retries=args.retries,
         )
         asyncio.run(enadownloader.download_project_fastqs())
