@@ -35,7 +35,7 @@ def strtobool(val: str):
 
 
 class ENAObject:
-    header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
+    header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
         self,
