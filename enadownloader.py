@@ -5,15 +5,15 @@ Robust tool to download fastq.gz files and metadata from ENA
 
 import argparse
 import csv
+import asyncio
 import hashlib
 import io
 import logging
-import multiprocessing as mp
 import os
 import shutil
+from collections import defaultdict
 from typing import Iterable
 import urllib.request as urlrequest
-from distutils.util import strtobool
 from os.path import basename, exists, join, splitext
 from pathlib import Path
 from time import sleep
@@ -21,6 +21,17 @@ from urllib.error import URLError
 
 import requests
 import xmltodict
+
+from excel import Data, ExcelWriter, FileHeader
+
+
+def strtobool(val: str):
+    if val in ("y", "yes", "true", "on", "1"):
+        return True
+    elif val in ("n", "no", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError(f"Unrecognised value: {val}")
 
 
 class ENAObject:
@@ -51,7 +62,7 @@ class ENAObject:
             raise ValueError("run_accession cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("run_accession must be a str")
         else:
             if not value:
@@ -85,7 +96,7 @@ class ENAObject:
             raise ValueError("ftp cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("ftp must be a str")
         else:
             if not value:
@@ -102,7 +113,7 @@ class ENAObject:
             raise ValueError("md5 cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("md5 must be a str")
         else:
             if not value:
@@ -116,7 +127,9 @@ class ENAObject:
     @md5_passed.setter
     def md5_passed(self, value):
         self._md5_passed = (
-            bool(strtobool(value)) if not isinstance(value, bool) else value
+            bool(strtobool(str(value).lower()))
+            if not isinstance(value, bool)
+            else value
         )
 
     @md5_passed.getter
@@ -251,6 +264,8 @@ class ENAMetadata:
         output_path = ENAMetadata._validate_output_path(output, overwrite)
         columns = self._validate_columns(columns)
         csv.register_dialect("unix-tab", delimiter="\t")
+        if self.metadata is None:
+            self.get_metadata()
 
         with open(output_path, "w") as f:
             writer = csv.DictWriter(
@@ -259,6 +274,7 @@ class ENAMetadata:
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
+        logging.info(f"Wrote metadata to {output_path}")
 
     def get_taxonomy(self, taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
@@ -288,6 +304,63 @@ class ENAMetadata:
             raise
         return names
 
+    def to_excel(self, output_dir: Path):
+        """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
+
+        studies = defaultdict(list)
+        if not self.metadata:
+            self.get_metadata()
+
+        for row in self.metadata:
+            studies[row["study_accession"]].append(row)
+
+        for study in studies.values():
+            fh = FileHeader(
+                "Pathogen Informatics",
+                "PaM",
+                "path-help",
+                study[0]["instrument_platform"],
+                study[0]["study_title"],
+                1,
+                "18/03/2025",
+                study[0]["study_accession"],
+            )
+
+            data = []
+            for row in study:
+                if not row["fastq_ftp"].strip():
+                    logging.warning(
+                        f"Can't find ftp for accession: {row['run_accession']}. Skipping."
+                    )
+                    continue
+
+                files = row["fastq_ftp"].split(";")
+
+                if len(files) == 1:
+                    filename = basename(files[0])
+                    matefile = None
+                else:
+                    try:
+                        filename = basename([f for f in files if "_1" in f][0])
+                        matefile = basename([f for f in files if "_2" in f][0])
+                    except IndexError:
+                        logging.warning(
+                            f"Can't correctly extract filename and matefile paths from row: {row}."
+                        )
+                        continue
+
+                data.append(
+                    Data(
+                        filename=filename,
+                        mate_file=matefile,
+                        sample_name=row["sample_accession"],
+                        taxon=int(row["tax_id"]),
+                    )
+                )
+
+                writer = ExcelWriter(fh, data)
+                writer.write(str(output_dir / f"{fh.study_accession_number.value}.xls"))
+
 
 class ENADownloader:
     class InvalidRow(ValueError):
@@ -297,7 +370,6 @@ class ENADownloader:
         self,
         accessions: Iterable,
         accession_type: str,
-        threads: int,
         output_dir: Path,
         create_study_folders: bool,
         project_id: str,
@@ -306,7 +378,6 @@ class ENADownloader:
     ):
         self.accessions = accessions
         self.accession_type = accession_type
-        self.threads = threads
         self.output_dir = output_dir
         self.create_study_folders = create_study_folders
         self.retries = retries
@@ -399,7 +470,7 @@ class ENADownloader:
         return response_parsed
 
     def wget(self, url, filename, tries=0):
-        print(f"Downloading {basename(filename)}")
+        logging.info(f"Downloading {basename(filename)}")
 
         try:
             with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -407,13 +478,15 @@ class ENADownloader:
         except URLError as err:
             if tries <= self.retries:
                 sleeptime = 2**tries
-                print(
-                    f"Download of {filename} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
+                logging.warning(
+                    f"Download of {basename(filename)} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
             else:
-                raise
+                # We probably don't want the program to terminate upon one failure,
+                # but give the users a unique value to search for
+                logging.warning(f"Download of {basename(filename)} failed entirely!")
 
     @staticmethod
     def parse_file_report(response: requests.Response):
@@ -475,25 +548,15 @@ class ENADownloader:
             for data in response_parsed.values():
                 fp.write(str(data) + "\n")
 
-    def listener(self, queue: mp.Queue):
+    def listener(self, m: str = None):
         if not exists(self.progress_file):
             with open(self.progress_file, "w") as f:
                 f.write(f"{ENAObject.header}\n")
 
-        with open(self.progress_file, "a") as f:
-            while True:
-                m = queue.get()
-                assert isinstance(
-                    m, (str, ENAObject)
-                ), f"Unrecognised type sent in queue: {m} of type {m.__class__.__name__}"
-                if m == "kill":
-                    queue.task_done()
-                    break
-
-                else:
-                    f.write(str(m) + "\n")
-                    f.flush()
-                    queue.task_done()
+        if m is not None:
+            with open(self.progress_file, "a") as f:
+                f.write(str(m) + "\n")
+                f.flush()
 
     @staticmethod
     def md5_check(fname):
@@ -503,9 +566,9 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_fastqs(self, ena: ENAObject, queue: mp.Queue, output_dir: Path):
+    def download_fastqs(self, ena: ENAObject):
         url = "ftp://" + ena.ftp
-        file_dir = output_dir
+        file_dir = self.output_dir
         if self.create_study_folders:
             file_dir = file_dir / ena.study_accession
             file_dir.mkdir(parents=True, exist_ok=True)
@@ -514,29 +577,19 @@ class ENADownloader:
         md5_f = self.md5_check(outfile)
 
         ena.md5_passed = md5_f == ena.md5
-        queue.put(ena)
+        self.listener(str(ena))
 
-    def download_project_fastqs(self):
+    async def download_project_fastqs(self):
         response = self.get_ftp_paths()
+        # Initialise file with header
+        self.listener()
 
-        number_of_threads = self.threads
-        manager = mp.Manager()
-        queue = manager.Queue()
-        with mp.Pool(processes=number_of_threads) as pool:
-            pool.apply_async(self.listener, (queue,))
-
-            res = pool.starmap_async(
-                self.download_fastqs,
-                [
-                    (item, queue, args.output_dir)
-                    for item in response.values()
-                    if not item.md5_passed
-                ],
-            )
-            res.get()
-
-            queue.put("kill")
-            queue.join()
+        to_dos = [item for item in response.values() if not item.md5_passed]
+        # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
+        # nor is there any alternative that is
+        await asyncio.gather(
+            *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
+        )
 
 
 class Parser:
@@ -568,31 +621,44 @@ class Parser:
             help="Directory in which to save downloaded files",
         )
         parser.add_argument(
-            "-@",
-            "--threads",
-            default=2,
-            type=cls.validate_threads,
-            help="Number of threads to use for download",
-        )
-        parser.add_argument(
-            "-v",
-            "--verbosity",
-            action="count",
-            default=0,
-            help="Use the option multiple times to increase output verbosity",
-        )
-        parser.add_argument(
-            "-m",
-            "--metadata-only",
-            action="store_true",
-            help="Only output a metadata tsv for the given ENA accessions",
-        )
-        parser.add_argument(
             "-c",
             "--create-study-folders",
             action="store_true",
             help="Organise the downloaded files by study",
         )
+        parser.add_argument(
+            "-r",
+            "--retries",
+            default=5,
+            type=cls.validate_retries,
+            help="Amount to retry each fastq file upon download interruption",
+        )
+        parser.add_argument(
+            "-v",
+            "--verbosity",
+            action="count",
+            default=1,
+            help="Use the option multiple times to increase output verbosity",
+        )
+        parser.add_argument(
+            "-m",
+            "--write-metadata",
+            action="store_true",
+            help="Output a metadata tsv for the given ENA accessions",
+        )
+        parser.add_argument(
+            "-d",
+            "--download-files",
+            action="store_true",
+            help="Download fastq files for the given ENA accessions",
+        )
+        parser.add_argument(
+            "-e",
+            "--write-excel",
+            action="store_true",
+            help="Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project",
+        )
+
         args = parser.parse_args()
 
         # Set log_level arg
@@ -623,22 +689,22 @@ class Parser:
         return Path(path).resolve()
 
     @staticmethod
-    def validate_threads(threads: str):
+    def validate_retries(retries: str):
         try:
-            threads = int(threads)
+            retries = int(retries)
         except ValueError:
-            raise argparse.ArgumentTypeError(f"invalid int value: {threads!r}")
-        if 1 < threads <= 100:
-            return threads
+            raise argparse.ArgumentTypeError(f"invalid int value: {retries!r}")
+        if retries >= 0:
+            return retries
         else:
             raise argparse.ArgumentTypeError(
-                f"invalid int value (must be between 2 and 100): {threads!r}"
+                f"invalid int value (must be nonnegative): {retries!r}"
             )
 
 
 if __name__ == "__main__":
     args = Parser.arg_parser()
-    this_file = join(args.output_dir, basename(splitext(__file__)[0]))
+    this_file = join(os.getcwd(), basename(splitext(__file__)[0]))
 
     # Set up logging
     fh = logging.FileHandler(f"{this_file}.log", mode="w")
@@ -660,17 +726,23 @@ if __name__ == "__main__":
             accessions.add(accession)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
-    enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
-    if args.metadata_only:
-        exit(0)
 
-    enadownloader = ENADownloader(
-        accessions=accessions,
-        accession_type=args.type,
-        threads=args.threads,
-        output_dir=args.output_dir,
-        create_study_folders=args.create_study_folders,
-        metadata_obj=enametadata,
-        project_id="PROJECT_ID",
-    )
-    enadownloader.download_project_fastqs()
+    if args.write_metadata:
+        enametadata.write_metadata_file(
+            args.output_dir / "metadata.tsv", overwrite=True
+        )
+
+    if args.write_excel:
+        enametadata.to_excel(args.output_dir)
+
+    if args.download_files:
+        enadownloader = ENADownloader(
+            accessions=accessions,
+            accession_type=args.type,
+            output_dir=args.output_dir,
+            create_study_folders=args.create_study_folders,
+            metadata_obj=enametadata,
+            project_id="PROJECT_ID",
+            retries=args.retries,
+        )
+        asyncio.run(enadownloader.download_project_fastqs())
