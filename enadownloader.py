@@ -304,15 +304,20 @@ class ENAMetadata:
             raise
         return names
 
-    def to_excel(self, output_dir: Path):
-        """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
-
+    def to_dict(self):
         studies = defaultdict(list)
         if not self.metadata:
             self.get_metadata()
 
         for row in self.metadata:
             studies[row["study_accession"]].append(row)
+
+        return studies
+
+    def to_excel(self, output_dir: Path):
+        """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
+
+        studies = self.to_dict()
 
         for study in studies.values():
             fh = FileHeader(
@@ -736,13 +741,15 @@ if __name__ == "__main__":
         enametadata.to_excel(args.output_dir)
 
     if args.download_files:
-        enadownloader = ENADownloader(
-            accessions=accessions,
-            accession_type=args.type,
-            output_dir=args.output_dir,
-            create_study_folders=args.create_study_folders,
-            metadata_obj=enametadata,
-            project_id="PROJECT_ID",
-            retries=args.retries,
-        )
-        asyncio.run(enadownloader.download_project_fastqs())
+        for project, rows in enametadata.to_dict().items():
+            accessions = [row["run_accession"] for row in rows]
+            enadownloader = ENADownloader(
+                accessions=accessions,
+                accession_type=args.type,
+                output_dir=args.output_dir,
+                create_study_folders=args.create_study_folders,
+                metadata_obj=enametadata,
+                project_id=project,
+                retries=args.retries,
+            )
+            asyncio.run(enadownloader.download_project_fastqs())
