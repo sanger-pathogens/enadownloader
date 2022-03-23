@@ -137,7 +137,15 @@ class ENAObject:
         return self._md5_passed
 
     def __str__(self):
-        return ",".join([self.run_accession, self.ftp, self.md5, str(self.md5_passed)])
+        return ",".join(
+            [
+                self.run_accession,
+                self.study_accession,
+                self.ftp,
+                self.md5,
+                str(self.md5_passed),
+            ]
+        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}: {str(self)}"
