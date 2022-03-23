@@ -320,6 +320,9 @@ class ENADownloader:
         if accession_type == "run":
             if not accession.startswith(("SRR", "ERR", "DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "sample":
+            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
+                raise ValueError(f"Invalid sample accession: {accession}")
         elif accession_type == "study":
             if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
                 raise ValueError(f"Invalid study accession: {accession}")
@@ -554,7 +557,7 @@ class Parser:
             "-t",
             "--type",
             required=True,
-            choices=["run", "study"],
+            choices=["run", "sample", "study"],
             help="Type of ENA accessions",
         )
         parser.add_argument(
