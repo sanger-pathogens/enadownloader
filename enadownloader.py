@@ -506,37 +506,6 @@ class ENADownloader:
                 # but give the users a unique value to search for
                 logging.warning(f"Download of {basename(filename)} failed entirely!")
 
-    @staticmethod
-    def parse_file_report(response: requests.Response):
-        response_files = {}
-        keys = None
-
-        for line in response.text.split("\n"):
-            if keys is None:
-                keys = line
-                continue
-            try:
-                (
-                    run_accession,
-                    study_accession,
-                    fastq_ftp,
-                    fastq_md5,
-                ) = line.strip().split()
-            except ValueError:
-                continue
-
-            file_links = fastq_ftp.split(";")
-            md5s = fastq_md5.split(";")
-
-            assert len(file_links) == len(md5s)
-
-            for f, m in zip(file_links, md5s):
-                obj = ENAObject(run_accession, study_accession, f, m)
-                response_files[obj.key] = obj
-
-        logging.info("fastq files parsed")
-        return response_files
-
     def load_response(self):
         response_parsed = {}
         with open(self.response_file) as fp:
