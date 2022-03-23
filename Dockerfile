@@ -17,7 +17,7 @@ COPY --from=compile-image /opt/venv /opt/venv
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY *.py .
+COPY *.py ./
 RUN chmod +x ./enadownloader.py
 
 ENV PATH="/opt:$PATH"
