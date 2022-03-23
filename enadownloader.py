@@ -10,6 +10,7 @@ import hashlib
 import io
 import logging
 import os
+import re
 import shutil
 from collections import defaultdict
 from typing import Iterable
@@ -578,6 +579,55 @@ class ENADownloader:
             *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
         )
 
+    def get_legacy_paths(self):
+        paths = {}
+        ena_objs = self.load_response()
+        for obj in ena_objs.values():
+            filename = basename(obj.ftp)
+            legacy_path = self.construct_legacy_path(filename)
+            paths[filename] = legacy_path
+        return paths
+
+    def construct_legacy_path(self, filename):
+        db = "pathogen_prok_external"
+        root_dir = f"/lustre/scratch118/infgen/pathogen/pathpipe/{db}/seq-pipelines"
+        if self.metadata_obj.metadata is None:
+            self.metadata_obj.get_metadata()
+        # run_accession = splitext(filename)[0]
+        # if run_accession.endswith(('_1', '_2')):
+        #     run_accession = run_accession[:-2]
+        # Alternatively
+        run = re.sub(r"(?:_1|_2)?\..*$", "", filename)
+        for row in self.metadata_obj.metadata:
+            if row["run_accession"] == run:
+                # TODO: study must be looked up in tracking database, ENA study_accession probably not appropriate
+                study = row["study_accession"]
+                taxonomy = self.metadata_obj.get_taxonomy(row["tax_id"])
+                scientific_name = self.metadata_obj.get_scientific_name(taxonomy)
+                genus, species_subspecies = self.metadata_obj.split_scientific_name(
+                    scientific_name
+                )
+                sample = row["sample_accession"]
+                # TODO: Although experiment_accession is not a library (it's probably more useful than simply
+                #  repeating the same information again in path). Original path in perl expected some library
+                #  identifier here.
+                #  Don't believe this has any bearing on pf functionality etc.
+                experiment = row["experiment_accession"]
+                path_components = [
+                    root_dir,
+                    genus,
+                    species_subspecies,
+                    "TRACKING",
+                    study,
+                    sample,
+                    "SLX",
+                    experiment,
+                    run,
+                    filename,
+                ]
+                return "/".join(path_components)
+        raise ValueError(f"Could not find run_accession in metadata: {run}")
+
 
 class Parser:
     @classmethod
@@ -738,3 +788,4 @@ if __name__ == "__main__":
                 retries=args.retries,
             )
             asyncio.run(enadownloader.download_project_fastqs())
+            legacy_paths = enadownloader.get_legacy_paths()
