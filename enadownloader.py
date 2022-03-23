@@ -274,6 +274,7 @@ class ENAMetadata:
             writer.writeheader()
             for row in self.metadata:
                 writer.writerow(row)
+
         logging.info(f"Wrote metadata to {output_path}")
 
     def get_taxonomy(self, taxon_id):
@@ -364,7 +365,11 @@ class ENAMetadata:
                 )
 
                 writer = ExcelWriter(fh, data)
-                writer.write(str(output_dir / f"{fh.study_accession_number.value}.xls"))
+
+                outfile = str(output_dir / f"{fh.study_accession_number.value}.xls")
+                writer.write(outfile)
+
+                logging.info(f"Wrote Excel file to {outfile}")
 
 
 class ENADownloader:

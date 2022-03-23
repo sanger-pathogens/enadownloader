@@ -17,12 +17,12 @@ COPY --from=compile-image /opt/venv /opt/venv
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY enadownloader.py ./enadownloader.py
+COPY *.py ./
 RUN chmod +x ./enadownloader.py
 
 ENV PATH="/opt:$PATH"
 
-FROM runner AS test
-COPY tests tests
-COPY requirements-test.txt requirements-test.txt
-RUN pip install -r requirements-test.txt
+#FROM runner AS test
+#COPY tests tests
+#COPY requirements-test.txt requirements-test.txt
+#RUN pip install -r requirements-test.txt
