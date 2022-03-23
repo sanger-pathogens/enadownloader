@@ -38,9 +38,15 @@ class ENAObject:
     header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-        self, run_accession: str, ftp: str, md5: str, md5_passed: bool = False
+        self,
+        run_accession: str,
+        study_accession: str,
+        ftp: str,
+        md5: str,
+        md5_passed: bool = False,
     ):
         self.run_accession = run_accession
+        self.study_accession = study_accession
         self.ftp = ftp
         self.md5 = md5
         self.md5_passed = md5_passed
@@ -62,6 +68,23 @@ class ENAObject:
             if not value:
                 raise ValueError("run_accession must not be an empty str")
         self._run_accession = value
+
+    @property
+    def study_accession(self):
+        return self._study_accession
+
+    @study_accession.setter
+    def study_accession(self, value):
+        if value is None:
+            raise ValueError("study_accession cannot be None")
+        try:
+            value = value.strip()
+        except ValueError:
+            raise ValueError("study_accession must be a str")
+        else:
+            if not value:
+                raise ValueError("study_accession must not be an empty str")
+        self._study_accession = value
 
     @property
     def ftp(self):
@@ -348,6 +371,7 @@ class ENADownloader:
         accessions: Iterable,
         accession_type: str,
         output_dir: Path,
+        create_study_folders: bool,
         project_id: str,
         metadata_obj: ENAMetadata,
         retries: int = 5,
@@ -355,6 +379,7 @@ class ENADownloader:
         self.accessions = accessions
         self.accession_type = accession_type
         self.output_dir = output_dir
+        self.create_study_folders = create_study_folders
         self.retries = retries
         self.metadata_obj = metadata_obj
         self.project_id = project_id
@@ -366,6 +391,9 @@ class ENADownloader:
         if accession_type == "run":
             if not accession.startswith(("SRR", "ERR", "DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "sample":
+            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
+                raise ValueError(f"Invalid sample accession: {accession}")
         elif accession_type == "study":
             if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
                 raise ValueError(f"Invalid study accession: {accession}")
@@ -425,13 +453,16 @@ class ENADownloader:
             self.metadata_obj.accessions = accessions
             self.metadata_obj.get_metadata()
             filtered_metadata = self.metadata_obj.filter_metadata(
-                fields=("run_accession", "fastq_ftp", "fastq_md5")
+                fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
             )
             ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
             response_parsed = {}
             for row in ftp_metadata:
                 obj = ENAObject(
-                    row["run_accession"], row["fastq_ftp"], row["fastq_md5"]
+                    row["run_accession"],
+                    row["study_accession"],
+                    row["fastq_ftp"],
+                    row["fastq_md5"],
                 )
                 response_parsed[obj.key] = obj
             self.write_response_file(response_parsed)
@@ -467,7 +498,12 @@ class ENADownloader:
                 keys = line
                 continue
             try:
-                run_accession, fastq_ftp, fastq_md5 = line.strip().split()
+                (
+                    run_accession,
+                    study_accession,
+                    fastq_ftp,
+                    fastq_md5,
+                ) = line.strip().split()
             except ValueError:
                 continue
 
@@ -477,7 +513,7 @@ class ENADownloader:
             assert len(file_links) == len(md5s)
 
             for f, m in zip(file_links, md5s):
-                obj = ENAObject(run_accession, f, m)
+                obj = ENAObject(run_accession, study_accession, f, m)
                 response_files[obj.key] = obj
 
         logging.info("fastq files parsed")
@@ -532,7 +568,11 @@ class ENADownloader:
 
     def download_fastqs(self, ena: ENAObject):
         url = "ftp://" + ena.ftp
-        outfile = self.output_dir / basename(ena.ftp)
+        file_dir = self.output_dir
+        if self.create_study_folders:
+            file_dir = file_dir / ena.study_accession
+            file_dir.mkdir(parents=True, exist_ok=True)
+        outfile = file_dir / basename(ena.ftp)
         self.wget(url, outfile)
         md5_f = self.md5_check(outfile)
 
@@ -570,7 +610,7 @@ class Parser:
             "-t",
             "--type",
             required=True,
-            choices=["run", "study"],
+            choices=["run", "sample", "study"],
             help="Type of ENA accessions",
         )
         parser.add_argument(
@@ -579,6 +619,12 @@ class Parser:
             default=os.getcwd(),
             type=cls.validate_dir,
             help="Directory in which to save downloaded files",
+        )
+        parser.add_argument(
+            "-c",
+            "--create-study-folders",
+            action="store_true",
+            help="Organise the downloaded files by study",
         )
         parser.add_argument(
             "-r",
@@ -694,6 +740,7 @@ if __name__ == "__main__":
             accessions=accessions,
             accession_type=args.type,
             output_dir=args.output_dir,
+            create_study_folders=args.create_study_folders,
             metadata_obj=enametadata,
             project_id="PROJECT_ID",
             retries=args.retries,
