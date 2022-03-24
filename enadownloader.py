@@ -259,7 +259,7 @@ class ENAMetadata:
     def _validate_columns(self, columns):
         if self.metadata is None:
             self.get_metadata()
-        available_columns = next(self.metadata.values()).keys()
+        available_columns = iter(self.metadata.values()).__next__().keys()
         if columns is None:
             columns = sorted(available_columns)
         invalid_columns = set(columns).difference(available_columns)
