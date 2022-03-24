@@ -725,7 +725,9 @@ if __name__ == "__main__":
     if args.download_files:
         for project, rows in enametadata.to_dict().items():
             run_accessions = [row["run_accession"] for row in rows]
-            enametadata_obj = ENAMetadata(accessions=run_accessions, accession_type="run")
+            enametadata_obj = ENAMetadata(
+                accessions=run_accessions, accession_type="run"
+            )
             enadownloader = ENADownloader(
                 accessions=run_accessions,
                 accession_type="run",
