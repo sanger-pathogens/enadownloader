@@ -629,10 +629,10 @@ class LegacyPathBuilder:
             genus, species_subspecies = names
         except ValueError:
             logging.warning(
-                f"Only one name found in scientific name: {name}. Repeating name to resolve."
+                f"Only one name found in scientific name: {name}. Using genus 'unknown' to resolve."
             )
             if len(names) == 1:
-                genus, species_subspecies = names * 2
+                genus, species_subspecies = "unknown", names[0]
             else:
                 logging.error(
                     f"Unexpected number of taxonomy names found in scientific name: {name}"
