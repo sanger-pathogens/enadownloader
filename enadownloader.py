@@ -724,13 +724,14 @@ if __name__ == "__main__":
 
     if args.download_files:
         for project, rows in enametadata.to_dict().items():
-            accessions = [row["run_accession"] for row in rows]
+            run_accessions = [row["run_accession"] for row in rows]
+            enametadata_obj = ENAMetadata(accessions=run_accessions, accession_type="run")
             enadownloader = ENADownloader(
-                accessions=accessions,
-                accession_type=args.type,
+                accessions=run_accessions,
+                accession_type="run",
                 output_dir=args.output_dir,
                 create_study_folders=args.create_study_folders,
-                metadata_obj=enametadata,
+                metadata_obj=enametadata_obj,
                 project_id=project,
                 retries=args.retries,
             )
