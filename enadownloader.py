@@ -588,7 +588,7 @@ class LegacyPathBuilder:
         try:
             row = self.metadata_obj.metadata[run]
         except KeyError:
-            raise ValueError(f"Could not find run_accession in metadata: {run}")
+            raise ValueError(f"Could not find run_accession in metadata: {run}") from None
         # TODO: study identifier is retrieved from tracking database, ENA study_accession probably not appropriate
         study = row["study_accession"]
         sample = row["sample_accession"]
