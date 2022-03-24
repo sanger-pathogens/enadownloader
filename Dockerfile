@@ -4,8 +4,12 @@ RUN python -m venv /opt/venv
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 
+# TODO Starting to wonder if we should just clone the repo with git
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+COPY pyproject.toml pyproject.toml
+COPY setup.cfg setup.cfg
+COPY src src
+RUN pip install -r requirements.txt .
 
 
 FROM python:3.10-alpine AS runner
