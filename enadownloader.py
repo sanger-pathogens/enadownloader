@@ -557,6 +557,10 @@ class ENADownloader:
 
         ena.md5_passed = md5_f == ena.md5
         self.listener(str(ena))
+        if ena.md5_passed:
+            return outfile
+        else:
+            return None
 
     async def download_project_fastqs(self):
         response = self.get_ftp_paths()
@@ -566,9 +570,10 @@ class ENADownloader:
         to_dos = [item for item in response.values() if not item.md5_passed]
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
-        await asyncio.gather(
+        outfiles = await asyncio.gather(
             *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
         )
+        return outfiles
 
 
 class LegacyPathBuilder:
@@ -623,11 +628,18 @@ class LegacyPathBuilder:
         try:
             genus, species_subspecies = names
         except ValueError:
-            logging.error(
-                f"Unexpected number of taxonomy names found in scientific name: {name}"
+            logging.warning(
+                f"Only one name found in scientific name: {name}. Using genus 'unknown' to resolve."
             )
-            raise
-        return names
+            if len(names) == 1:
+                genus, species_subspecies = "unknown", names[0]
+            else:
+                logging.error(
+                    f"Unexpected number of taxonomy names found in scientific name: {name}"
+                )
+                raise
+        species_subspecies = species_subspecies.replace(" ", "_")
+        return genus, species_subspecies
 
 
 class Parser:
@@ -773,6 +785,7 @@ if __name__ == "__main__":
     if args.write_excel:
         enametadata.to_excel(args.output_dir)
 
+    output_files = []
     if args.download_files:
         for project, rows in enametadata.to_dict().items():
             run_accessions = [row["run_accession"] for row in rows]
@@ -788,13 +801,17 @@ if __name__ == "__main__":
                 project_id=project,
                 retries=args.retries,
             )
-            asyncio.run(enadownloader.download_project_fastqs())
+            outfiles = asyncio.run(enadownloader.download_project_fastqs())
+            output_files.extend([path for path in outfiles if path is not None])
 
-    # Test legacy path building
-    legacy_path = LegacyPathBuilder(
-        root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
-        db="pathogen_prok_external",
-        metadata_obj=enametadata,
-        filepath="/path/to/some/cache/DRR028935_2.fastq.gz",
-    ).build_path()
-    print(legacy_path)
+        # Test legacy path building
+        cache_to_legacy_map = {}
+        for path in output_files:
+            legacy_path = LegacyPathBuilder(
+                root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
+                db="pathogen_prok_external",
+                metadata_obj=enametadata,
+                filepath=path,
+            ).build_path()
+            cache_to_legacy_map[path] = legacy_path
+        print(cache_to_legacy_map)
