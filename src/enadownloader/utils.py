@@ -14,12 +14,12 @@ class ENAObject:
     header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-        self,
-        run_accession: str,
-        study_accession: str,
-        ftp: str,
-        md5: str,
-        md5_passed: bool = False,
+            self,
+            run_accession: str,
+            study_accession: str,
+            ftp: str,
+            md5: str,
+            md5_passed: bool = False,
     ):
         self.run_accession = run_accession
         self.study_accession = study_accession
@@ -98,7 +98,7 @@ class ENAObject:
 
     @property
     def md5_passed(self):
-        pass
+        return self._md5_passed
 
     @md5_passed.setter
     def md5_passed(self, value):
@@ -107,10 +107,6 @@ class ENAObject:
             if not isinstance(value, bool)
             else value
         )
-
-    @md5_passed.getter
-    def md5_passed(self):
-        return self._md5_passed
 
     def __str__(self):
         return ",".join(
@@ -125,3 +121,9 @@ class ENAObject:
 
     def __repr__(self):
         return f"{self.__class__.__name__}: {str(self)}"
+
+    def __hash__(self):
+        return hash(self.ftp)
+
+    def __eq__(self, other):
+        return self.ftp == other.ftp
