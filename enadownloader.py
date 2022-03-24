@@ -789,7 +789,6 @@ if __name__ == "__main__":
             asyncio.run(enadownloader.download_project_fastqs())
 
     # Test legacy path building
-    enametadata.get_metadata()
     legacy_path = LegacyPathBuilder(
         root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
         db="pathogen_prok_external",
