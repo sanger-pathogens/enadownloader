@@ -14,12 +14,12 @@ class ENAObject:
     header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
-            self,
-            run_accession: str,
-            study_accession: str,
-            ftp: str,
-            md5: str,
-            md5_passed: bool = False,
+        self,
+        run_accession: str,
+        study_accession: str,
+        ftp: str,
+        md5: str,
+        md5_passed: bool = False,
     ):
         self.run_accession = run_accession
         self.study_accession = study_accession

@@ -158,7 +158,6 @@ class ExcelWriter:
         logging.info(f"Wrote Excel file to {basename(filename)}")
 
 
-
 if __name__ == "__main__":
     header = FileHeader(
         "Ellen Higginson",
