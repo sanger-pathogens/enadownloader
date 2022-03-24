@@ -225,7 +225,7 @@ class ENAMetadata:
     def _parse_metadata(self, response):
         csv.register_dialect("unix-tab", delimiter="\t")
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
-        return list(reader)
+        return {row["run_accession"]: row for row in reader}
 
     def filter_metadata(self, fields=None):
         filtered_metadata = []
@@ -233,7 +233,7 @@ class ENAMetadata:
             self.get_metadata()
         if fields is None:
             fields = []
-        for row in self.metadata:
+        for run, row in self.metadata.items():
             try:
                 new_row = {field: row[field] for field in fields}
             except KeyError as err:
@@ -259,7 +259,7 @@ class ENAMetadata:
     def _validate_columns(self, columns):
         if self.metadata is None:
             self.get_metadata()
-        available_columns = self.metadata[0].keys()
+        available_columns = iter(self.metadata.values()).__next__().keys()
         if columns is None:
             columns = sorted(available_columns)
         invalid_columns = set(columns).difference(available_columns)
@@ -281,12 +281,13 @@ class ENAMetadata:
                 f, columns, extrasaction="ignore", dialect="unix-tab"
             )
             writer.writeheader()
-            for row in self.metadata:
+            for run, row in self.metadata.items():
                 writer.writerow(row)
 
         logging.info(f"Wrote metadata to {output_path}")
 
-    def get_taxonomy(self, taxon_id):
+    @staticmethod
+    def _get_taxonomy(taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
         try:
             response = requests.get(url)
@@ -300,26 +301,16 @@ class ENAMetadata:
             root = xmltodict.parse(response.content.strip())
             return root["TAXON_SET"]
 
-    def get_scientific_name(self, taxonomy):
+    def get_scientific_name(self, taxon_id: str):
+        taxonomy = self._get_taxonomy(taxon_id)
         return taxonomy["taxon"]["@scientificName"]
-
-    def split_scientific_name(self, name: str):
-        names = [n.strip() for n in name.split(maxsplit=1)]
-        try:
-            genus, species_subspecies = names
-        except ValueError:
-            logging.error(
-                f"Unexpected number of taxonomy names found in scientific name: {name}"
-            )
-            raise
-        return names
 
     def to_dict(self):
         studies = defaultdict(list)
         if not self.metadata:
             self.get_metadata()
 
-        for row in self.metadata:
+        for run, row in self.metadata.items():
             studies[row["study_accession"]].append(row)
 
         return studies
@@ -579,54 +570,60 @@ class ENADownloader:
             *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
         )
 
-    def get_legacy_paths(self):
-        paths = {}
-        ena_objs = self.load_response()
-        for obj in ena_objs.values():
-            filename = basename(obj.ftp)
-            legacy_path = self.construct_legacy_path(filename)
-            paths[filename] = legacy_path
-        return paths
 
-    def construct_legacy_path(self, filename):
-        db = "pathogen_prok_external"
-        root_dir = f"/lustre/scratch118/infgen/pathogen/pathpipe/{db}/seq-pipelines"
+class LegacyPathBuilder:
+    def __init__(self, root_dir: str, db: str, metadata_obj: ENAMetadata, filepath: str):
+        self.root_dir = root_dir
+        self.db = db
+        self.metadata_obj = metadata_obj
+        self.filepath = Path(filepath)
+        self.filename = self.filepath.name
+
+    def build_path(self):
         if self.metadata_obj.metadata is None:
             self.metadata_obj.get_metadata()
-        # run_accession = splitext(filename)[0]
-        # if run_accession.endswith(('_1', '_2')):
-        #     run_accession = run_accession[:-2]
-        # Alternatively
-        run = re.sub(r"(?:_1|_2)?\..*$", "", filename)
-        for row in self.metadata_obj.metadata:
-            if row["run_accession"] == run:
-                # TODO: study must be looked up in tracking database, ENA study_accession probably not appropriate
-                study = row["study_accession"]
-                taxonomy = self.metadata_obj.get_taxonomy(row["tax_id"])
-                scientific_name = self.metadata_obj.get_scientific_name(taxonomy)
-                genus, species_subspecies = self.metadata_obj.split_scientific_name(
-                    scientific_name
-                )
-                sample = row["sample_accession"]
-                # TODO: Although experiment_accession is not a library (it's probably more useful than simply
-                #  repeating the same information again in path). Original path in perl expected some library
-                #  identifier here.
-                #  Don't believe this has any bearing on pf functionality etc.
-                experiment = row["experiment_accession"]
-                path_components = [
-                    root_dir,
-                    genus,
-                    species_subspecies,
-                    "TRACKING",
-                    study,
-                    sample,
-                    "SLX",
-                    experiment,
-                    run,
-                    filename,
-                ]
-                return "/".join(path_components)
-        raise ValueError(f"Could not find run_accession in metadata: {run}")
+        run = re.sub(r"(?:_1|_2)?\..*$", "", self.filename)
+        try:
+            row = self.metadata_obj.metadata[run]
+        except KeyError:
+            raise ValueError(f"Could not find run_accession in metadata: {run}")
+        # TODO: study identifier is retrieved from tracking database, ENA study_accession probably not appropriate
+        study = row["study_accession"]
+        sample = row["sample_accession"]
+        # TODO: Original path in perl expected some library identifier here. This was typically supplied by
+        #  the user in the input spreadsheet. Since ENA metadata does not supply any "library accession",
+        #  we could use experiment_accession as a surrogate, unless there is a more appropriate value
+        #  available from somewhere. Don't believe this has any bearing on pf functionality etc.
+        experiment = row["experiment_accession"]
+        taxon_scientific_name = self.metadata_obj.get_scientific_name(row["tax_id"])
+        genus, species_subspecies = self._split_scientific_name(taxon_scientific_name)
+        path_components = [
+            self.root_dir,
+            self.db,
+            "seq-pipelines",
+            genus,
+            species_subspecies,
+            "TRACKING",
+            study,
+            sample,
+            "SLX",
+            experiment,
+            run,
+            self.filename,
+        ]
+        return join(*path_components)
+
+    @staticmethod
+    def _split_scientific_name(name: str):
+        names = [n.strip() for n in name.split(maxsplit=1)]
+        try:
+            genus, species_subspecies = names
+        except ValueError:
+            logging.error(
+                f"Unexpected number of taxonomy names found in scientific name: {name}"
+            )
+            raise
+        return names
 
 
 class Parser:
@@ -788,4 +785,8 @@ if __name__ == "__main__":
                 retries=args.retries,
             )
             asyncio.run(enadownloader.download_project_fastqs())
-            legacy_paths = enadownloader.get_legacy_paths()
+
+    # Test legacy path building
+    enametadata.get_metadata()
+    legacy_path = LegacyPathBuilder(root_dir="/lustre/scratch118/infgen/pathogen/pathpipe", db="pathogen_prok_external", metadata_obj=enametadata, filepath="/path/to/some/cache/DRR028935_2.fastq.gz").build_path()
+    print(legacy_path)
