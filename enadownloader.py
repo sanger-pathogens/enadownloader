@@ -35,7 +35,7 @@ def strtobool(val: str):
 
 
 class ENAObject:
-    header = "run_accession,fastq_ftp,fastq_md5,md5_passed"
+    header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
         self,
@@ -137,7 +137,15 @@ class ENAObject:
         return self._md5_passed
 
     def __str__(self):
-        return ",".join([self.run_accession, self.ftp, self.md5, str(self.md5_passed)])
+        return ",".join(
+            [
+                self.run_accession,
+                self.study_accession,
+                self.ftp,
+                self.md5,
+                str(self.md5_passed),
+            ]
+        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}: {str(self)}"
@@ -497,37 +505,6 @@ class ENADownloader:
                 # We probably don't want the program to terminate upon one failure,
                 # but give the users a unique value to search for
                 logging.warning(f"Download of {basename(filename)} failed entirely!")
-
-    @staticmethod
-    def parse_file_report(response: requests.Response):
-        response_files = {}
-        keys = None
-
-        for line in response.text.split("\n"):
-            if keys is None:
-                keys = line
-                continue
-            try:
-                (
-                    run_accession,
-                    study_accession,
-                    fastq_ftp,
-                    fastq_md5,
-                ) = line.strip().split()
-            except ValueError:
-                continue
-
-            file_links = fastq_ftp.split(";")
-            md5s = fastq_md5.split(";")
-
-            assert len(file_links) == len(md5s)
-
-            for f, m in zip(file_links, md5s):
-                obj = ENAObject(run_accession, study_accession, f, m)
-                response_files[obj.key] = obj
-
-        logging.info("fastq files parsed")
-        return response_files
 
     def load_response(self):
         response_parsed = {}
