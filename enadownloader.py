@@ -11,6 +11,7 @@ import io
 import logging
 import os
 import shutil
+import sys
 from collections import defaultdict
 from typing import Iterable
 import urllib.request as urlrequest
@@ -381,6 +382,35 @@ class ENAMetadata:
                 logging.info(f"Wrote Excel file to {outfile}")
 
 
+class AccessionValidator:
+    @staticmethod
+    def validate_accession(accession, accession_type):
+        if accession_type == "run":
+            if not accession.startswith(("SRR", "ERR", "DRR")):
+                raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "sample":
+            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
+                raise ValueError(f"Invalid sample accession: {accession}")
+        elif accession_type == "study":
+            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
+                raise ValueError(f"Invalid study accession: {accession}")
+        else:
+            raise ValueError(f"Invalid accession_type: {accession_type}")
+
+    @classmethod
+    def parse_accessions(cls, accessions, accession_type="run"):
+        parsed_accessions = []
+        for accession in accessions:
+            try:
+                cls.validate_accession(accession, accession_type)
+            except ValueError as err:
+                logging.warning(f"{err}. Skipping...")
+                continue
+            else:
+                parsed_accessions.append(accession)
+        return parsed_accessions
+
+
 class ENADownloader:
     class InvalidRow(ValueError):
         pass
@@ -405,31 +435,6 @@ class ENADownloader:
 
         self.response_file = join(output_dir, f".{project_id}.csv")
         self.progress_file = join(output_dir, f".{project_id}.progress.csv")
-
-    def validate_accession(self, accession, accession_type):
-        if accession_type == "run":
-            if not accession.startswith(("SRR", "ERR", "DRR")):
-                raise ValueError(f"Invalid run accession: {accession}")
-        elif accession_type == "sample":
-            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
-                raise ValueError(f"Invalid sample accession: {accession}")
-        elif accession_type == "study":
-            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
-                raise ValueError(f"Invalid study accession: {accession}")
-        else:
-            raise ValueError(f"Invalid accession_type: {accession_type}")
-
-    def parse_accessions(self, accessions, accession_type="run"):
-        parsed_accessions = []
-        for accession in accessions:
-            try:
-                self.validate_accession(accession, accession_type)
-            except ValueError as err:
-                logging.warning(f"{err}. Skipping...")
-                continue
-            else:
-                parsed_accessions.append(accession)
-        return parsed_accessions
 
     def parse_ftp_metadata(self, metadata):
         parsed_metadata = []
@@ -466,10 +471,7 @@ class ENADownloader:
             response_parsed = self.load_response()
             logging.info("Loaded existing response file")
         else:
-            accessions = self.parse_accessions(
-                self.accessions, accession_type=self.accession_type
-            )
-            self.metadata_obj.accessions = accessions
+            self.metadata_obj.accessions = self.accessions
             self.metadata_obj.get_metadata()
             filtered_metadata = self.metadata_obj.filter_metadata(
                 fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
@@ -713,7 +715,15 @@ if __name__ == "__main__":
             accession = line.strip()
             accessions.add(accession)
 
-    enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
+    logging.debug(f"Checking accession validity...")
+    valid_accessions = AccessionValidator.parse_accessions(
+        accessions=accessions, accession_type=args.type
+    )
+    if not valid_accessions:
+        logging.fatal("No valid accessions provided")
+        sys.exit(255)
+
+    enametadata = ENAMetadata(accessions=valid_accessions, accession_type=args.type)
 
     if args.write_metadata:
         enametadata.write_metadata_file(
