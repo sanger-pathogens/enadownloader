@@ -638,7 +638,7 @@ class LegacyPathBuilder:
                     f"Unexpected number of taxonomy names found in scientific name: {name}"
                 )
                 raise
-        species_subspecies = species_subspecies.replace(' ', '_')
+        species_subspecies = species_subspecies.replace(" ", "_")
         return genus, species_subspecies
 
 
