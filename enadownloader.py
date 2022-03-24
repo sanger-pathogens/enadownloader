@@ -628,11 +628,17 @@ class LegacyPathBuilder:
         try:
             genus, species_subspecies = names
         except ValueError:
-            logging.error(
-                f"Unexpected number of taxonomy names found in scientific name: {name}"
+            logging.warning(
+                f"Only one name found in scientific name: {name}. Repeating name to resolve."
             )
-            raise
-        return names
+            if len(names) == 1:
+                genus, species_subspecies = names * 2
+            else:
+                logging.error(
+                    f"Unexpected number of taxonomy names found in scientific name: {name}"
+                )
+                raise
+        return genus, species_subspecies
 
 
 class Parser:
@@ -807,4 +813,4 @@ if __name__ == "__main__":
                 filepath=path,
             ).build_path()
             cache_to_legacy_map[path] = legacy_path
-            print(cache_to_legacy_map)
+        print(cache_to_legacy_map)
