@@ -11,6 +11,7 @@ import io
 import logging
 import os
 import shutil
+import sys
 from collections import defaultdict
 from typing import Iterable
 import urllib.request as urlrequest
@@ -381,32 +382,9 @@ class ENAMetadata:
                 logging.info(f"Wrote Excel file to {outfile}")
 
 
-class ENADownloader:
-    class InvalidRow(ValueError):
-        pass
-
-    def __init__(
-        self,
-        accessions: Iterable,
-        accession_type: str,
-        output_dir: Path,
-        create_study_folders: bool,
-        project_id: str,
-        metadata_obj: ENAMetadata,
-        retries: int = 5,
-    ):
-        self.accessions = accessions
-        self.accession_type = accession_type
-        self.output_dir = output_dir
-        self.create_study_folders = create_study_folders
-        self.retries = retries
-        self.metadata_obj = metadata_obj
-        self.project_id = project_id
-
-        self.response_file = join(output_dir, f".{project_id}.csv")
-        self.progress_file = join(output_dir, f".{project_id}.progress.csv")
-
-    def validate_accession(self, accession, accession_type):
+class AccessionValidator:
+    @staticmethod
+    def validate_accession(accession, accession_type):
         if accession_type == "run":
             if not accession.startswith(("SRR", "ERR", "DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
@@ -419,17 +397,40 @@ class ENADownloader:
         else:
             raise ValueError(f"Invalid accession_type: {accession_type}")
 
-    def parse_accessions(self, accessions, accession_type="run"):
+    @classmethod
+    def parse_accessions(cls, accessions, accession_type="run"):
         parsed_accessions = []
         for accession in accessions:
             try:
-                self.validate_accession(accession, accession_type)
+                cls.validate_accession(accession, accession_type)
             except ValueError as err:
                 logging.warning(f"{err}. Skipping...")
                 continue
             else:
                 parsed_accessions.append(accession)
         return parsed_accessions
+
+
+class ENADownloader:
+    class InvalidRow(ValueError):
+        pass
+
+    def __init__(
+        self,
+        metadata_obj: ENAMetadata,
+        output_dir: Path,
+        create_study_folders: bool,
+        project_id: str,
+        retries: int = 5,
+    ):
+        self.metadata_obj = metadata_obj
+        self.output_dir = output_dir
+        self.create_study_folders = create_study_folders
+        self.retries = retries
+        self.project_id = project_id
+
+        self.response_file = join(output_dir, f".{project_id}.csv")
+        self.progress_file = join(output_dir, f".{project_id}.progress.csv")
 
     def parse_ftp_metadata(self, metadata):
         parsed_metadata = []
@@ -466,10 +467,6 @@ class ENADownloader:
             response_parsed = self.load_response()
             logging.info("Loaded existing response file")
         else:
-            accessions = self.parse_accessions(
-                self.accessions, accession_type=self.accession_type
-            )
-            self.metadata_obj.accessions = accessions
             self.metadata_obj.get_metadata()
             filtered_metadata = self.metadata_obj.filter_metadata(
                 fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
@@ -713,7 +710,15 @@ if __name__ == "__main__":
             accession = line.strip()
             accessions.add(accession)
 
-    enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
+    logging.debug(f"Checking accession validity...")
+    valid_accessions = AccessionValidator.parse_accessions(
+        accessions=accessions, accession_type=args.type
+    )
+    if not valid_accessions:
+        logging.fatal("No valid accessions provided")
+        sys.exit(1)
+
+    enametadata = ENAMetadata(accessions=valid_accessions, accession_type=args.type)
 
     if args.write_metadata:
         enametadata.write_metadata_file(
@@ -730,11 +735,9 @@ if __name__ == "__main__":
                 accessions=run_accessions, accession_type="run"
             )
             enadownloader = ENADownloader(
-                accessions=run_accessions,
-                accession_type="run",
+                metadata_obj=enametadata_obj,
                 output_dir=args.output_dir,
                 create_study_folders=args.create_study_folders,
-                metadata_obj=enametadata_obj,
                 project_id=project,
                 retries=args.retries,
             )
