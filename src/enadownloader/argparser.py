@@ -8,6 +8,7 @@ class Parser:
     @classmethod
     def arg_parser(cls):
         parser = argparse.ArgumentParser(
+            prog="enadownloader",
             description=__doc__,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
