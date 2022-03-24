@@ -417,20 +417,16 @@ class ENADownloader:
 
     def __init__(
         self,
-        accessions: Iterable,
-        accession_type: str,
+        metadata_obj: ENAMetadata,
         output_dir: Path,
         create_study_folders: bool,
         project_id: str,
-        metadata_obj: ENAMetadata,
         retries: int = 5,
     ):
-        self.accessions = accessions
-        self.accession_type = accession_type
+        self.metadata_obj = metadata_obj
         self.output_dir = output_dir
         self.create_study_folders = create_study_folders
         self.retries = retries
-        self.metadata_obj = metadata_obj
         self.project_id = project_id
 
         self.response_file = join(output_dir, f".{project_id}.csv")
@@ -471,7 +467,6 @@ class ENADownloader:
             response_parsed = self.load_response()
             logging.info("Loaded existing response file")
         else:
-            self.metadata_obj.accessions = self.accessions
             self.metadata_obj.get_metadata()
             filtered_metadata = self.metadata_obj.filter_metadata(
                 fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
@@ -721,7 +716,7 @@ if __name__ == "__main__":
     )
     if not valid_accessions:
         logging.fatal("No valid accessions provided")
-        sys.exit(255)
+        sys.exit(1)
 
     enametadata = ENAMetadata(accessions=valid_accessions, accession_type=args.type)
 
@@ -740,11 +735,9 @@ if __name__ == "__main__":
                 accessions=run_accessions, accession_type="run"
             )
             enadownloader = ENADownloader(
-                accessions=run_accessions,
-                accession_type="run",
+                metadata_obj=enametadata_obj,
                 output_dir=args.output_dir,
                 create_study_folders=args.create_study_folders,
-                metadata_obj=enametadata_obj,
                 project_id=project,
                 retries=args.retries,
             )
