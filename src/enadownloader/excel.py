@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from xlwt import Workbook, Worksheet, easyxf, Style
+from xlwt import Style, Workbook, Worksheet, easyxf
 
 st = easyxf("pattern: pattern solid;")
 st.pattern.pattern_fore_colour = 50
