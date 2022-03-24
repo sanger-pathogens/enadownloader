@@ -572,7 +572,9 @@ class ENADownloader:
 
 
 class LegacyPathBuilder:
-    def __init__(self, root_dir: str, db: str, metadata_obj: ENAMetadata, filepath: str):
+    def __init__(
+        self, root_dir: str, db: str, metadata_obj: ENAMetadata, filepath: str
+    ):
         self.root_dir = root_dir
         self.db = db
         self.metadata_obj = metadata_obj
@@ -788,5 +790,10 @@ if __name__ == "__main__":
 
     # Test legacy path building
     enametadata.get_metadata()
-    legacy_path = LegacyPathBuilder(root_dir="/lustre/scratch118/infgen/pathogen/pathpipe", db="pathogen_prok_external", metadata_obj=enametadata, filepath="/path/to/some/cache/DRR028935_2.fastq.gz").build_path()
+    legacy_path = LegacyPathBuilder(
+        root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
+        db="pathogen_prok_external",
+        metadata_obj=enametadata,
+        filepath="/path/to/some/cache/DRR028935_2.fastq.gz",
+    ).build_path()
     print(legacy_path)
