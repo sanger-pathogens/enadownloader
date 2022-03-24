@@ -31,6 +31,22 @@ Check Black format:
     - pip install black
     - black . --check --diff --color
 
+Test with pytest:
+    stage: test
+    only:
+      - branches
+    except:
+      - tags
+    script:
+      - python -m venv venv
+      - source venv/bin/activate
+      - pip install --upgrade pip
+      - pip install -r requirements-test.txt
+      - pip install -r requirements.txt -e .
+      - pip list
+      - pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
+    coverage: /^.*TOTAL.+?(\d+\%)$/
+
 Branch builds:
   stage: build
   variables:
