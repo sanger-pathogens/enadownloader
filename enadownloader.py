@@ -193,17 +193,18 @@ class ENAMetadata:
         """
         if fields is None:
             fields = self.get_available_fields()
-        url = (
-            "https://www.ebi.ac.uk/ena/portal/api/search?"
-            "result=read_run"
-            f"&fields={','.join(fields)}"
-            f"&includeAccessionType={accession_type}"
-            f"&includeAccessions={','.join(accessions)}"
-            f"&limit=0"
-            f"&format=tsv"
-        )
+        post_data = {
+            "result": "read_run",
+            "fields": f"{','.join(fields)}",
+            "includeAccessionType": f"{accession_type}",
+            "includeAccessions": f"{','.join(accessions)}",
+            "limit": 0,
+            "format": "tsv",
+        }
         try:
-            response = requests.get(url)
+            response = requests.post(
+                "https://www.ebi.ac.uk/ena/portal/api/search", data=post_data
+            )
             response.raise_for_status()
         except requests.HTTPError as err:
             if tries <= self.retries:
