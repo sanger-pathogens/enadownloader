@@ -240,5 +240,3 @@ class ENAMetadata:
 
                 outfile = str(output_dir / f"{fh.study_accession_number.value}.xls")
                 writer.write(outfile)
-
-                logging.info(f"Wrote Excel file to {outfile}")
