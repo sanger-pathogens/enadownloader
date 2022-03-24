@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from os.path import join
+from pathlib import Path
 
 from enadownloader.argparser import Parser
 from enadownloader.enadownloader import ENADownloader
@@ -35,20 +36,33 @@ enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
 if args.write_metadata:
     enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
 
-if args.write_excel:
-    enametadata.to_excel(args.output_dir)
-
-if args.download_files:
+# They both need folder management, so I'm grouping them together
+if args.download_files or args.write_excel:
     for project, rows in enametadata.to_dict().items():
         run_accessions = [row["run_accession"] for row in rows]
         enametadata_obj = ENAMetadata(accessions=run_accessions, accession_type="run")
-        enadownloader = ENADownloader(
-            accessions=run_accessions,
-            accession_type="run",
-            output_dir=args.output_dir,
-            create_study_folders=args.create_study_folders,
-            metadata_obj=enametadata_obj,
-            project_id=project,
-            retries=args.retries,
-        )
-        asyncio.run(enadownloader.download_project_fastqs())
+
+        # Do generic stuff first
+        if args.create_study_folders:
+            output_dir: Path = args.output_dir / project
+            logging.info(f"Using output directory {join(*output_dir.parts[-2:])}")
+        else:
+            output_dir: Path = args.output_dir
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Specifics
+        if args.write_excel:
+            enametadata_obj.to_excel(output_dir)
+
+        if args.download_files:
+            enadownloader = ENADownloader(
+                accessions=run_accessions,
+                accession_type="run",
+                output_dir=output_dir,
+                metadata_obj=enametadata_obj,
+                retries=args.retries,
+            )
+            asyncio.run(enadownloader.download_project_fastqs())
+
+        logging.info("-" * 50)

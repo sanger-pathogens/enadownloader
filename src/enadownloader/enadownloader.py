@@ -8,7 +8,7 @@ import hashlib
 import logging
 import shutil
 import urllib.request as urlrequest
-from os.path import basename, exists, join
+from os.path import basename, exists
 from pathlib import Path
 from time import sleep
 from typing import Iterable
@@ -27,23 +27,19 @@ class ENADownloader:
         accessions: Iterable,
         accession_type: str,
         output_dir: Path,
-        create_study_folders: bool,
-        project_id: str,
         metadata_obj: ENAMetadata,
         retries: int = 5,
     ):
         self.accessions = accessions
         self.accession_type = accession_type
         self.output_dir = output_dir
-        self.create_study_folders = create_study_folders
         self.retries = retries
         self.metadata_obj = metadata_obj
-        self.project_id = project_id
 
-        self.response_file = join(output_dir, f".{project_id}.csv")
-        self.progress_file = join(output_dir, f".{project_id}.progress.csv")
+        self.progress_file = self.output_dir / ".progress.csv"
 
-    def validate_accession(self, accession, accession_type):
+    @staticmethod
+    def validate_accession(accession, accession_type):
         if accession_type == "run":
             if not accession.startswith(("SRR", "ERR", "DRR")):
                 raise ValueError(f"Invalid run accession: {accession}")
@@ -68,7 +64,7 @@ class ENADownloader:
                 parsed_accessions.append(accession)
         return parsed_accessions
 
-    def parse_ftp_metadata(self, metadata):
+    def parse_ftp_metadata(self, metadata) -> list[dict[str, str]]:
         parsed_metadata = []
         for row in metadata:
             try:
@@ -81,7 +77,7 @@ class ENADownloader:
             parsed_metadata.extend(new_rows)
         return parsed_metadata
 
-    def flatten_multivalued_ftp_attrs(self, row):
+    def flatten_multivalued_ftp_attrs(self, row) -> list[dict[str, str]]:
         if "fastq_ftp" in row and not row["fastq_ftp"].strip():
             raise self.InvalidRow("No FTP URL was found")
         ftp_links = row["fastq_ftp"].split(";")
@@ -98,31 +94,35 @@ class ENADownloader:
             rows.append(new_row)
         return rows
 
-    def get_ftp_paths(self):
-        if exists(self.response_file):
-            response_parsed = self.load_response()
-            logging.info("Loaded existing response file")
-        else:
-            accessions = self.parse_accessions(
-                self.accessions, accession_type=self.accession_type
+    def get_ftp_paths(self) -> dict[str, ENAObject]:
+        accessions = self.parse_accessions(
+            self.accessions, accession_type=self.accession_type
+        )
+        self.metadata_obj.accessions = accessions
+        self.metadata_obj.get_metadata()
+        filtered_metadata = self.metadata_obj.filter_metadata(
+            fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
+        )
+
+        md5_passed_files = self.load_progress()
+
+        ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
+
+        response_parsed = {}
+        for row in ftp_metadata:
+            obj = ENAObject(
+                row["run_accession"],
+                row["study_accession"],
+                row["fastq_ftp"],
+                row["fastq_md5"],
             )
-            self.metadata_obj.accessions = accessions
-            self.metadata_obj.get_metadata()
-            filtered_metadata = self.metadata_obj.filter_metadata(
-                fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
-            )
-            ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
-            response_parsed = {}
-            for row in ftp_metadata:
-                obj = ENAObject(
-                    row["run_accession"],
-                    row["study_accession"],
-                    row["fastq_ftp"],
-                    row["fastq_md5"],
-                )
-                response_parsed[obj.key] = obj
-            self.write_response_file(response_parsed)
-            logging.info("Parsed metadata into response file")
+
+            if obj in md5_passed_files:
+                logging.info(f"{basename(obj.ftp)} already exists. Skipping.")
+                continue
+
+            response_parsed[obj.key] = obj
+
         return response_parsed
 
     def wget(self, url, filename, tries=0):
@@ -144,17 +144,8 @@ class ENADownloader:
                 # but give the users a unique value to search for
                 logging.warning(f"Download of {basename(filename)} failed entirely!")
 
-    def load_response(self):
-        response_parsed = {}
-        with open(self.response_file) as fp:
-            # skip header
-            fp.readline()
-
-            for line in fp:
-                line = line.strip().split(",")
-                obj = ENAObject(*line)
-                response_parsed[obj.key] = obj
-
+    def load_progress(self) -> set[ENAObject]:
+        md5_passed_files = set()
         if exists(self.progress_file):
             with open(self.progress_file) as prf:
                 # skip header
@@ -163,24 +154,19 @@ class ENADownloader:
                 for line in prf:
                     line = line.strip().split(",")
                     obj = ENAObject(*line)
-                    response_parsed[obj.key].md5_passed = line[-1]
+                    if obj.md5_passed:
+                        md5_passed_files.add(obj)
 
-        return response_parsed
+        return md5_passed_files
 
-    def write_response_file(self, response_parsed):
-        with open(self.response_file, "w") as fp:
-            fp.write(f"{ENAObject.header}\n")
-            for data in response_parsed.values():
-                fp.write(str(data) + "\n")
-
-    def listener(self, m: str = None):
+    def write_progress_file(self, message: str = None):
         if not exists(self.progress_file):
             with open(self.progress_file, "w") as f:
                 f.write(f"{ENAObject.header}\n")
 
-        if m is not None:
+        if message is not None:
             with open(self.progress_file, "a") as f:
-                f.write(str(m) + "\n")
+                f.write(str(message) + "\n")
                 f.flush()
 
     @staticmethod
@@ -193,23 +179,21 @@ class ENADownloader:
 
     def download_fastqs(self, ena: ENAObject):
         url = "ftp://" + ena.ftp
-        file_dir = self.output_dir
-        if self.create_study_folders:
-            file_dir = file_dir / ena.study_accession
-            file_dir.mkdir(parents=True, exist_ok=True)
-        outfile = file_dir / basename(ena.ftp)
+        outfile = self.output_dir / basename(ena.ftp)
         self.wget(url, outfile)
         md5_f = self.md5_check(outfile)
 
         ena.md5_passed = md5_f == ena.md5
-        self.listener(str(ena))
+        self.write_progress_file(str(ena))
 
     async def download_project_fastqs(self):
-        response = self.get_ftp_paths()
-        # Initialise file with header
-        self.listener()
+        ftp_paths = self.get_ftp_paths()
 
-        to_dos = [item for item in response.values() if not item.md5_passed]
+        to_dos = [item for item in ftp_paths.values() if not item.md5_passed]
+
+        # Initialise files with header
+        self.write_progress_file()
+
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
         await asyncio.gather(
