@@ -58,9 +58,9 @@ class ENAMetadata:
             fields = self.get_available_fields()
         post_data = {
             "result": "read_run",
-            "fields": ','.join(fields),
+            "fields": ",".join(fields),
             "includeAccessionType": accession_type,
-            "includeAccessions": ','.join(accessions),
+            "includeAccessions": ",".join(accessions),
             "limit": 0,
             "format": "tsv",
         }
