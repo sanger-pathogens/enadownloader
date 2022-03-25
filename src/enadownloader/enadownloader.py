@@ -24,45 +24,15 @@ class ENADownloader:
 
     def __init__(
         self,
-        accessions: Iterable,
-        accession_type: str,
-        output_dir: Path,
         metadata_obj: ENAMetadata,
+        output_dir: Path,
         retries: int = 5,
     ):
-        self.accessions = accessions
-        self.accession_type = accession_type
         self.output_dir = output_dir
         self.retries = retries
         self.metadata_obj = metadata_obj
 
         self.progress_file = self.output_dir / ".progress.csv"
-
-    @staticmethod
-    def validate_accession(accession, accession_type):
-        if accession_type == "run":
-            if not accession.startswith(("SRR", "ERR", "DRR")):
-                raise ValueError(f"Invalid run accession: {accession}")
-        elif accession_type == "sample":
-            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
-                raise ValueError(f"Invalid sample accession: {accession}")
-        elif accession_type == "study":
-            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
-                raise ValueError(f"Invalid study accession: {accession}")
-        else:
-            raise ValueError(f"Invalid accession_type: {accession_type}")
-
-    def parse_accessions(self, accessions, accession_type="run"):
-        parsed_accessions = []
-        for accession in accessions:
-            try:
-                self.validate_accession(accession, accession_type)
-            except ValueError as err:
-                logging.warning(f"{err}. Skipping...")
-                continue
-            else:
-                parsed_accessions.append(accession)
-        return parsed_accessions
 
     def parse_ftp_metadata(self, metadata) -> list[dict[str, str]]:
         parsed_metadata = []
@@ -95,10 +65,6 @@ class ENADownloader:
         return rows
 
     def get_ftp_paths(self) -> dict[str, ENAObject]:
-        accessions = self.parse_accessions(
-            self.accessions, accession_type=self.accession_type
-        )
-        self.metadata_obj.accessions = accessions
         self.metadata_obj.get_metadata()
         filtered_metadata = self.metadata_obj.filter_metadata(
             fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
@@ -186,6 +152,9 @@ class ENADownloader:
         ena.md5_passed = md5_f == ena.md5
         self.write_progress_file(str(ena))
 
+        if ena.md5_passed:
+            return outfile
+
     async def download_project_fastqs(self):
         ftp_paths = self.get_ftp_paths()
 
@@ -196,6 +165,7 @@ class ENADownloader:
 
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
-        await asyncio.gather(
+        outfiles = await asyncio.gather(
             *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
         )
+        return outfiles

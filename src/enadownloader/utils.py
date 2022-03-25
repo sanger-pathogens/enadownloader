@@ -1,3 +1,4 @@
+import logging
 from os.path import basename, splitext
 
 
@@ -127,3 +128,32 @@ class ENAObject:
 
     def __eq__(self, other):
         return self.ftp == other.ftp
+
+
+class AccessionValidator:
+    @staticmethod
+    def validate_accession(accession, accession_type):
+        if accession_type == "run":
+            if not accession.startswith(("SRR", "ERR", "DRR")):
+                raise ValueError(f"Invalid run accession: {accession}")
+        elif accession_type == "sample":
+            if not accession.startswith(("ERS", "DRS", "SRS", "SAM")):
+                raise ValueError(f"Invalid sample accession: {accession}")
+        elif accession_type == "study":
+            if not accession.startswith(("SRP", "ERP", "DRP", "PRJ")):
+                raise ValueError(f"Invalid study accession: {accession}")
+        else:
+            raise ValueError(f"Invalid accession_type: {accession_type}")
+
+    @classmethod
+    def parse_accessions(cls, accessions, accession_type="run"):
+        parsed_accessions = []
+        for accession in accessions:
+            try:
+                cls.validate_accession(accession, accession_type)
+            except ValueError as err:
+                logging.warning(f"{err}. Skipping...")
+                continue
+            else:
+                parsed_accessions.append(accession)
+        return parsed_accessions

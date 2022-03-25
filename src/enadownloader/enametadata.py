@@ -58,9 +58,9 @@ class ENAMetadata:
             fields = self.get_available_fields()
         post_data = {
             "result": "read_run",
-            "fields": f"{','.join(fields)}",
-            "includeAccessionType": f"{accession_type}",
-            "includeAccessions": f"{','.join(accessions)}",
+            "fields": ','.join(fields),
+            "includeAccessionType": accession_type,
+            "includeAccessions": ','.join(accessions),
             "limit": 0,
             "format": "tsv",
         }
@@ -85,10 +85,10 @@ class ENAMetadata:
         else:
             return response
 
-    def _parse_metadata(self, response):
+    def _parse_metadata(self, response) -> dict[str, list[dict[str, str]]]:
         csv.register_dialect("unix-tab", delimiter="\t")
         reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
-        return list(reader)
+        return {row["run_accession"]: row for row in reader}
 
     def filter_metadata(self, fields=None):
         filtered_metadata = []
@@ -96,7 +96,7 @@ class ENAMetadata:
             self.get_metadata()
         if fields is None:
             fields = []
-        for row in self.metadata:
+        for run, row in self.metadata.items():
             try:
                 new_row = {field: row[field] for field in fields}
             except KeyError as err:
@@ -122,7 +122,7 @@ class ENAMetadata:
     def _validate_columns(self, columns):
         if self.metadata is None:
             self.get_metadata()
-        available_columns = self.metadata[0].keys()
+        available_columns = next(iter(self.metadata.values())).keys()
         if columns is None:
             columns = sorted(available_columns)
         invalid_columns = set(columns).difference(available_columns)
@@ -144,12 +144,13 @@ class ENAMetadata:
                 f, columns, extrasaction="ignore", dialect="unix-tab"
             )
             writer.writeheader()
-            for row in self.metadata:
+            for row in self.metadata.values():
                 writer.writerow(row)
 
         logging.info(f"Wrote metadata to {output_path}")
 
-    def get_taxonomy(self, taxon_id):
+    @staticmethod
+    def _get_taxonomy(taxon_id):
         url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
         try:
             response = requests.get(url)
@@ -163,26 +164,16 @@ class ENAMetadata:
             root = xmltodict.parse(response.content.strip())
             return root["TAXON_SET"]
 
-    def get_scientific_name(self, taxonomy):
+    def get_scientific_name(self, taxon_id: str):
+        taxonomy = self._get_taxonomy(taxon_id)
         return taxonomy["taxon"]["@scientificName"]
-
-    def split_scientific_name(self, name: str):
-        names = [n.strip() for n in name.split(maxsplit=1)]
-        try:
-            genus, species_subspecies = names
-        except ValueError:
-            logging.error(
-                f"Unexpected number of taxonomy names found in scientific name: {name}"
-            )
-            raise
-        return names
 
     def to_dict(self):
         studies = defaultdict(list)
         if not self.metadata:
             self.get_metadata()
 
-        for row in self.metadata:
+        for row in self.metadata.values():
             studies[row["study_accession"]].append(row)
 
         return studies
