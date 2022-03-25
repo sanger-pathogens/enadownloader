@@ -27,6 +27,8 @@ logging.basicConfig(
     handlers=[fh, sh],
 )
 
+logging.info(f"Absolute output folder path: {args.output_dir.resolve()}")
+
 with open(args.input) as f:
     accessions = set()
     for line in f:

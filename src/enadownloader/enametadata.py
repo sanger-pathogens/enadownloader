@@ -122,12 +122,17 @@ class ENAMetadata:
     def _validate_columns(self, columns):
         if self.metadata is None:
             self.get_metadata()
+
         available_columns = next(iter(self.metadata.values())).keys()
+
         if columns is None:
             columns = sorted(available_columns)
+
         invalid_columns = set(columns).difference(available_columns)
+
         if invalid_columns:
             raise ValueError(f"Columns not available: {sorted(invalid_columns)}")
+
         return columns
 
     def write_metadata_file(
@@ -147,7 +152,7 @@ class ENAMetadata:
             for row in self.metadata.values():
                 writer.writerow(row)
 
-        logging.info(f"Wrote metadata to {output_path}")
+        logging.info(f"Wrote metadata to {basename(output_path)}")
 
     @staticmethod
     def _get_taxonomy(taxon_id):
