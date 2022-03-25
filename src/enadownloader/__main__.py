@@ -69,14 +69,19 @@ if args.download_files or args.write_excel:
 
         logging.info("-" * 50)
 
-    # Test legacy path building
-    cache_to_legacy_map = {}
-    for path in output_files:
-        legacy_path = LegacyPathBuilder(
-            root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
-            db="pathogen_prok_external",
-            metadata_obj=enametadata,
-            filepath=path,
-        ).build_path()
-        cache_to_legacy_map[path] = legacy_path
-    pprint(cache_to_legacy_map)
+    # TODO I'm disabling this for now, so we can build a release and give it to the scientists.
+    #   Since this will be only used by us in the bridger, I've already discussed with Will to move
+    #   this functionality to the bridger once that's more established.
+    #   Because that'll be a different script, I think we can safely do a find on all ".progress.csv" files and extract
+    #   the paths from there
+    # # Test legacy path building
+    # cache_to_legacy_map = {}
+    # for path in output_files:
+    #     legacy_path = LegacyPathBuilder(
+    #         root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
+    #         db="pathogen_prok_external",
+    #         metadata_obj=enametadata,
+    #         filepath=path,
+    #     ).build_path()
+    #     cache_to_legacy_map[path] = legacy_path
+    # pprint(cache_to_legacy_map)
