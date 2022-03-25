@@ -1,0 +1,1 @@
+from enadownloader.__main__ import main
