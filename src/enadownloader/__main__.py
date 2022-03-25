@@ -48,7 +48,7 @@ if args.download_files or args.write_excel:
         # Do generic stuff first
         if args.create_study_folders:
             output_dir: Path = args.output_dir / project
-            logging.info(f"Using output directory {join(*output_dir.parts[-2:])}")
+            logging.info(f"Using output directory {output_dir.relative_to(args.output_dir.parent)}")
         else:
             output_dir: Path = args.output_dir
 
