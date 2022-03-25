@@ -3,6 +3,7 @@ import logging
 import os
 from os.path import join
 from pathlib import Path
+from pprint import pprint
 
 from enadownloader.argparser import Parser
 from enadownloader.enadownloader import ENADownloader
@@ -39,7 +40,7 @@ if args.write_metadata:
 
 # They both need folder management, so I'm grouping them together
 if args.download_files or args.write_excel:
-    output_files = []
+    output_files = set()
     for project, rows in enametadata.to_dict().items():
         run_accessions = [row["run_accession"] for row in rows]
         enametadata_obj = ENAMetadata(accessions=run_accessions, accession_type="run")
@@ -63,19 +64,19 @@ if args.download_files or args.write_excel:
                 metadata_obj=enametadata_obj,
                 retries=args.retries,
             )
-            outfiles = asyncio.run(enadownloader.download_project_fastqs())
-            output_files.extend([path for path in outfiles if path is not None])
+            asyncio.run(enadownloader.download_project_fastqs())
+            output_files.update({ena.ftp for ena in enadownloader.load_progress()})
 
         logging.info("-" * 50)
 
-        # Test legacy path building
-        cache_to_legacy_map = {}
-        for path in output_files:
-            legacy_path = LegacyPathBuilder(
-                root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
-                db="pathogen_prok_external",
-                metadata_obj=enametadata,
-                filepath=path,
-            ).build_path()
-            cache_to_legacy_map[path] = legacy_path
-        print(cache_to_legacy_map)
+    # Test legacy path building
+    cache_to_legacy_map = {}
+    for path in output_files:
+        legacy_path = LegacyPathBuilder(
+            root_dir="/lustre/scratch118/infgen/pathogen/pathpipe",
+            db="pathogen_prok_external",
+            metadata_obj=enametadata,
+            filepath=path,
+        ).build_path()
+        cache_to_legacy_map[path] = legacy_path
+    pprint(cache_to_legacy_map)
