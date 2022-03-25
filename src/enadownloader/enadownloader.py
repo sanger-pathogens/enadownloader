@@ -152,9 +152,6 @@ class ENADownloader:
         ena.md5_passed = md5_f == ena.md5
         self.write_progress_file(str(ena))
 
-        if ena.md5_passed:
-            return outfile
-
     async def download_project_fastqs(self):
         ftp_paths = self.get_ftp_paths()
 
@@ -165,7 +162,6 @@ class ENADownloader:
 
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
-        outfiles = await asyncio.gather(
+        await asyncio.gather(
             *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
         )
-        return outfiles
