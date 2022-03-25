@@ -38,6 +38,7 @@ Test with pytest:
     except:
       - tags
     script:
+      - apt -qy install python-is-python3
       - python -m venv venv
       - source venv/bin/activate
       - pip install --upgrade pip
