@@ -12,15 +12,17 @@ FROM python:3.10-alpine AS runner
 
 WORKDIR /opt
 
-COPY --from=compile-image /opt/venv /opt/venv
+COPY --from=compile-image /opt/venv ./venv
 
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY *.py ./
-RUN chmod +x ./enadownloader.py
+COPY src .
+COPY enadownloader.sh .
+RUN chmod +x enadownloader.sh
+COPY sra_ids_test.txt .
 
-ENV PATH="/opt:$PATH"
+ENV PATH="/opt/:$PATH"
 
 #FROM runner AS test
 #COPY tests tests

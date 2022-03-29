@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""
+Robust tool to download fastq.gz files and metadata from ENA
+"""
+
+import asyncio
+import hashlib
+import logging
+import shutil
+import urllib.request as urlrequest
+from os.path import basename, exists
+from pathlib import Path
+from time import sleep
+from typing import Iterable
+from urllib.error import URLError
+
+from enadownloader.enametadata import ENAMetadata
+from enadownloader.utils import ENAObject
+
+
+class ENADownloader:
+    class InvalidRow(ValueError):
+        pass
+
+    def __init__(
+        self,
+        metadata_obj: ENAMetadata,
+        output_dir: Path,
+        retries: int = 5,
+    ):
+        self.output_dir = output_dir
+        self.retries = retries
+        self.metadata_obj = metadata_obj
+
+        self.progress_file = self.output_dir / ".progress.csv"
+
+    def parse_ftp_metadata(self, metadata) -> list[dict[str, str]]:
+        parsed_metadata = []
+        for row in metadata:
+            try:
+                new_rows = self.flatten_multivalued_ftp_attrs(row)
+            except self.InvalidRow as err:
+                logging.warning(
+                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
+                )
+                continue
+            parsed_metadata.extend(new_rows)
+        return parsed_metadata
+
+    def flatten_multivalued_ftp_attrs(self, row) -> list[dict[str, str]]:
+        if "fastq_ftp" in row and not row["fastq_ftp"].strip():
+            raise self.InvalidRow("No FTP URL was found")
+        ftp_links = row["fastq_ftp"].split(";")
+        md5s = row["fastq_md5"].split(";")
+        if len(md5s) != len(ftp_links):
+            raise self.InvalidRow(
+                "The number of FTP URLs does not match the number of MD5 checksums"
+            )
+        rows = []
+        for f, m in zip(ftp_links, md5s):
+            new_row = row.copy()
+            new_row["fastq_ftp"] = f
+            new_row["fastq_md5"] = m
+            rows.append(new_row)
+        return rows
+
+    def get_ftp_paths(self) -> dict[str, ENAObject]:
+        self.metadata_obj.get_metadata()
+        filtered_metadata = self.metadata_obj.filter_metadata(
+            fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
+        )
+
+        md5_passed_files = self.load_progress()
+
+        ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
+
+        response_parsed = {}
+        for row in ftp_metadata:
+            obj = ENAObject(
+                row["run_accession"],
+                row["study_accession"],
+                row["fastq_ftp"],
+                row["fastq_md5"],
+            )
+
+            if obj in md5_passed_files:
+                logging.info(f"{basename(obj.ftp)} already exists. Skipping.")
+                continue
+
+            response_parsed[obj.key] = obj
+
+        return response_parsed
+
+    def wget(self, url, filename, tries=0):
+        logging.info(f"Downloading {basename(filename)}")
+
+        try:
+            with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
+                shutil.copyfileobj(response, out_file)
+        except URLError as err:
+            if tries <= self.retries:
+                sleeptime = 2**tries
+                logging.warning(
+                    f"Download of {basename(filename)} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
+                )
+                sleep(sleeptime)
+                self.wget(url, filename, tries + 1)
+            else:
+                # We probably don't want the program to terminate upon one failure,
+                # but give the users a unique value to search for
+                logging.warning(f"Download of {basename(filename)} failed entirely!")
+
+    def load_progress(self) -> set[ENAObject]:
+        md5_passed_files = set()
+        if exists(self.progress_file):
+            with open(self.progress_file) as prf:
+                # skip header
+                prf.readline()
+
+                for line in prf:
+                    line = line.strip().split(",")
+                    obj = ENAObject(*line)
+                    if obj.md5_passed:
+                        md5_passed_files.add(obj)
+
+        return md5_passed_files
+
+    def write_progress_file(self, message: str = None):
+        if not exists(self.progress_file):
+            with open(self.progress_file, "w") as f:
+                f.write(f"{ENAObject.header}\n")
+
+        if message is not None:
+            with open(self.progress_file, "a") as f:
+                f.write(str(message) + "\n")
+                f.flush()
+
+    @staticmethod
+    def md5_check(fname):
+        hash_md5 = hashlib.md5()
+        with open(fname, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+
+    def download_fastqs(self, ena: ENAObject):
+        url = "ftp://" + ena.ftp
+        outfile = self.output_dir / basename(ena.ftp)
+        self.wget(url, outfile)
+        md5_f = self.md5_check(outfile)
+
+        ena.md5_passed = md5_f == ena.md5
+        self.write_progress_file(str(ena))
+
+    async def download_project_fastqs(self):
+        ftp_paths = self.get_ftp_paths()
+
+        to_dos = [item for item in ftp_paths.values() if not item.md5_passed]
+
+        # Initialise files with header
+        self.write_progress_file()
+
+        # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
+        # nor is there any alternative that is
+        await asyncio.gather(
+            *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
+        )

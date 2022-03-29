@@ -1,6 +1,8 @@
+import logging
+from os.path import basename
 from typing import List, Union
 
-from xlwt import Workbook, Worksheet, easyxf, Style
+from xlwt import Style, Workbook, Worksheet, easyxf
 
 st = easyxf("pattern: pattern solid;")
 st.pattern.pattern_fore_colour = 50
@@ -153,6 +155,7 @@ class ExcelWriter:
             row += 1
 
         self.book.save(filename)
+        logging.info(f"Wrote Excel file to {basename(filename)}")
 
 
 if __name__ == "__main__":
