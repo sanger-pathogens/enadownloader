@@ -47,15 +47,27 @@ pip install -r requirements-test.txt -r requirements.txt -e .
 ```
 
 ### Docker
+To run the `enadownloader` script from the production docker image (tagged `enadownload:latest` below):
 ```bash
-docker build . -t ENADownload
-docker run -it --entrypoint /bin/ash ENADownload
+docker build -t enadownload:latest --target=runner .
+docker run -it --rm enadownload:latest enadownloader --help
+```
+
+To access a shell inside the image:
+```bash
+docker run -it --rm enadownload:latest ash
 ```
 
 ## Testing
 After installing packages required for development, run:
 ```bash
 pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
+```
+
+Alternatively, run within the test docker image:
+```bash
+docker build -t enadownload:test --target=test .
+docker run -it --rm enadownload:test pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
 ```
 
 ## Distribution
