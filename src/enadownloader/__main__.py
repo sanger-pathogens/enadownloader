@@ -36,9 +36,15 @@ with open(args.input) as f:
         accession = line.strip()
         accessions.add(accession)
 
-parsed_accessions = AccessionValidator.parse_accessions(accessions, args.type)
+logging.debug(f"Checking accession validity...")
+valid_accessions = AccessionValidator.parse_accessions(
+    accessions=accessions, accession_type=args.type
+)
+if not valid_accessions:
+    logging.fatal("No valid accessions provided")
+    exit(1)
 
-enametadata = ENAMetadata(accessions=parsed_accessions, accession_type=args.type)
+enametadata = ENAMetadata(accessions=valid_accessions, accession_type=args.type)
 
 if args.write_metadata:
     enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
