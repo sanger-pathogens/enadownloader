@@ -36,7 +36,7 @@ options:
 Downloads may fail, but download progress is saved. 
 Each downloaded file is checked for integrity by comparing md5 checksums.
 Re-running the script will only download files that have not yet been downloaded successfully.
-The script is downloads files at a limited rate to avoid overloading the ENA FTP server.
+The script downloads files at a limited rate to avoid overloading the ENA FTP server.
 
 ## Install
 ### Development
