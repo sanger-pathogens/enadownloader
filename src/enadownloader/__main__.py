@@ -9,6 +9,7 @@ from enadownloader.argparser import Parser
 from enadownloader.enadownloader import ENADownloader
 from enadownloader.enametadata import ENAMetadata
 from enadownloader.pathbuilder import LegacyPathBuilder
+from enadownloader.utils import AccessionValidator
 
 logfile = join(os.getcwd(), "enadownloader.log")
 
@@ -35,7 +36,9 @@ with open(args.input) as f:
         accession = line.strip()
         accessions.add(accession)
 
-enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
+parsed_accessions = AccessionValidator.parse_accessions(accessions, args.type)
+
+enametadata = ENAMetadata(accessions=parsed_accessions, accession_type=args.type)
 
 if args.write_metadata:
     enametadata.write_metadata_file(args.output_dir / "metadata.tsv", overwrite=True)
