@@ -1,7 +1,7 @@
-# ENA Download
+# enadownloader
 A robust tool for downloading fastq.gz and metadata from ENA.
 
-The [enadownloader.py](src/enadownloader/enadownloader.py) script has three main functionalities.
+The tool has three main functionalities.
 Given a file of project/study, sample or run accessions, it can:
 1) Download read data in fastq.gz format from the ENA FTP for multiple, associated runs concurrently.
 2) Download metadata for associated runs in tsv format
@@ -9,9 +9,7 @@ Given a file of project/study, sample or run accessions, it can:
 
 ## Usage
 ```
-usage: enadownloader.py [-h] -i INPUT -t {run,sample,study} [-o OUTPUT_DIR] [-c] [-r RETRIES] [-v] [-m] [-d] [-e]
-
-Robust tool to download fastq.gz files and metadata from ENA
+usage: enadownloader [-h] -i INPUT -t {run,sample,study} [-o OUTPUT_DIR] [-c] [-r RETRIES] [-v] [-m] [-d] [-e]
 
 options:
   -h, --help            show this help message and exit
@@ -28,7 +26,8 @@ options:
   -v, --verbosity       Use the option multiple times to increase output verbosity (default: 1)
   -m, --write-metadata  Output a metadata tsv for the given ENA accessions (default: False)
   -d, --download-files  Download fastq files for the given ENA accessions (default: False)
-  -e, --write-excel     Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project (default: False)
+  -e, --write-excel     Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project (default:
+                        False)
 ```
 
 ## Downloading read data
