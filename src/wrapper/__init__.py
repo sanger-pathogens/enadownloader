@@ -1,1 +1,2 @@
-from enadownloader.__main__ import main
+# noinspection PyUnresolvedReferences
+from enadownloader import main
