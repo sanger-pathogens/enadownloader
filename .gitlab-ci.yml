@@ -62,7 +62,7 @@ Update version on tag:
   only:
     - tags
   script:
-    - export TAG=$(${CI_COMMIT_TAG} | cut -c 2-)
+    - export TAG=$(echo ${CI_COMMIT_TAG} | cut -c 2-)
     - sed -i .o "s/version = .*/version = ${TAG}/g" setup.cfg
     - if [ -f setup.cfg.o ]; then rm setup.cfg.o; fi
 
