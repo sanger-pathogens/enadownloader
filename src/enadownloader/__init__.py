@@ -75,4 +75,5 @@ def main():
                 asyncio.run(enadownloader.download_project_fastqs())
                 output_files.update({ena.ftp for ena in enadownloader.load_progress()})
 
-            logging.info("-" * 50)
+            if args.create_study_folders:
+                logging.info("-" * 50)
