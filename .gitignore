@@ -1,5 +1,10 @@
 venv
-.idea
+build
+dist
 __pycache__
+.idea
+.coverage
+.pytest_cache
 *.log
 results
+*.egg-info

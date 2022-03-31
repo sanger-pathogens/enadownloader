@@ -31,6 +31,20 @@ Check Black format:
     - pip install black
     - black . --check --diff --color
 
+Test with pytest:
+    stage: test
+    only:
+      - branches
+    except:
+      - tags
+    <<: *start_docker
+    script:
+      - docker build -t test_image .
+      - docker run test_image pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
+    coverage: /^.*TOTAL.+?(\d+\%)$/
+    # TODO: Remove this once we have reasonable coverage!
+    allow_failure: true
+
 Branch builds:
   stage: build
   variables:
@@ -51,4 +65,7 @@ Tag builds:
     - tags
   <<: *start_docker
   script:
+    - export VTAG=$(echo ${CI_COMMIT_TAG} | cut -c 2-)
+    - sed -i.o "s/version = .*/version = ${VTAG}/g" setup.cfg
+    - if [ -f setup.cfg.o ]; then rm setup.cfg.o; fi
     - *build_and_push
