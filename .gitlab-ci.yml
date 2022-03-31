@@ -58,12 +58,12 @@ Branch builds:
     - *build_and_push
 
 Update version on tag:
-  stage: build
+  stage: format
   only:
     - tags
   script:
     - export TAG=$(echo ${CI_COMMIT_TAG} | cut -c 2-)
-    - sed -i .o "s/version = .*/version = ${TAG}/g" setup.cfg
+    - sed -i.o "s/version = .*/version = ${TAG}/g" setup.cfg
     - if [ -f setup.cfg.o ]; then rm setup.cfg.o; fi
 
 Tag builds:
