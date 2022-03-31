@@ -7,6 +7,7 @@ from pathlib import Path
 from enadownloader.argparser import Parser
 from enadownloader.enadownloader import ENADownloader
 from enadownloader.enametadata import ENAMetadata
+from enadownloader.utils import AccessionValidator
 
 
 def main():
@@ -34,6 +35,14 @@ def main():
         for line in f:
             accession = line.strip()
             accessions.add(accession)
+
+    logging.debug(f"Checking accession validity...")
+    valid_accessions = AccessionValidator.parse_accessions(
+        accessions=accessions, accession_type=args.type
+    )
+    if not valid_accessions:
+        logging.fatal("No valid accessions provided")
+        exit(1)
 
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
 
