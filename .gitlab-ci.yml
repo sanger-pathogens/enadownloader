@@ -57,15 +57,6 @@ Branch builds:
   script:
     - *build_and_push
 
-Update version on tag:
-  stage: format
-  only:
-    - tags
-  script:
-    - export TAG=$(echo ${CI_COMMIT_TAG} | cut -c 2-)
-    - sed -i.o "s/version = .*/version = ${TAG}/g" setup.cfg
-    - if [ -f setup.cfg.o ]; then rm setup.cfg.o; fi
-
 Tag builds:
   stage: build
   variables:
@@ -74,4 +65,7 @@ Tag builds:
     - tags
   <<: *start_docker
   script:
+    - export VTAG=$(echo ${CI_COMMIT_TAG} | cut -c 2-)
+    - sed -i.o "s/version = .*/version = ${VTAG}/g" setup.cfg
+    - if [ -f setup.cfg.o ]; then rm setup.cfg.o; fi
     - *build_and_push
