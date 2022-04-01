@@ -39,7 +39,7 @@ Test with pytest:
       - tags
     <<: *start_docker
     script:
-      - docker build -t test_image .
+      - docker build -t test_image --target test .
       - docker run test_image pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
     coverage: /^.*TOTAL.+?(\d+\%)$/
     # TODO: Remove this once we have reasonable coverage!
