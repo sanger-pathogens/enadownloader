@@ -1,34 +1,32 @@
 FROM python:3.10 AS compile-image
 
+ARG WORK="/opt"
+WORKDIR "$WORK"
+
 RUN python -m venv venv
 # Make sure we use the virtualenv:
-ENV PATH="/venv/bin:$PATH"
+ENV PATH="$WORK/venv/bin:$PATH"
 
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+COPY setup.cfg pyproject.toml ./
+COPY src src
 
+# Setting in-tree-build as pip started complaining about a potential new feature
+RUN pip install --use-feature=in-tree-build .
+
+FROM compile-image AS test
+
+COPY tests tests
+
+RUN pip install --use-feature=in-tree-build -e ".[test]"
+
+# Loose default for quick testing
+CMD ["pytest", "--cov", "src", "--cov-branch", "--cov-report", "term-missing", "--cov-fail-under", "80"]
 
 FROM python:3.10-alpine AS runner
 
 ARG WORK="/opt"
 WORKDIR "$WORK"
 
-COPY --from=compile-image venv venv
-
+COPY --from=compile-image $WORK/venv venv
 # Make sure we use the virtualenv
 ENV PATH="$WORK/venv/bin:$PATH"
-
-COPY setup.cfg pyproject.toml ./
-COPY src src
-# `pip install .` does not work (uses unexpected `pip`),
-# nor does specifying absolute path of venv `pip` (not found by `ash`)
-RUN python -m pip install .
-
-
-FROM runner AS test
-
-COPY tests tests
-COPY requirements-test.txt requirements-test.txt
-RUN pip install -r requirements-test.txt -e .
-
-COPY sra_ids_test.txt .
