@@ -17,8 +17,7 @@ class LegacyPathBuilder:
         self.filename = self.filepath.name
 
     def build_path(self):
-        if self.metadata_obj.metadata is None:
-            self.metadata_obj.get_metadata()
+        self.metadata_obj.get_metadata()
         run = re.sub(r"(?:_1|_2)?\..*$", "", self.filename)
         try:
             row = self.metadata_obj.metadata[run]

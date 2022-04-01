@@ -11,7 +11,7 @@ def strtobool(val: str):
         raise ValueError(f"Unrecognised value: {val}")
 
 
-class ENAObject:
+class ENAFTPContainer:
     header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
 
     def __init__(
