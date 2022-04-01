@@ -1,7 +1,6 @@
 import csv
 import io
 import logging
-import os
 from collections import defaultdict
 from os.path import basename
 from pathlib import Path
@@ -26,7 +25,8 @@ class ENAMetadata:
         self.retries = retries
         self.metadata = None
 
-    def get_available_fields(self, result_type: str = "read_run"):
+    @staticmethod
+    def get_available_fields(result_type: str = "read_run"):
         url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
         response = requests.get(url)
         try:
@@ -40,8 +40,14 @@ class ENAMetadata:
         return fields
 
     def get_metadata(self):
+        if self.metadata is not None:
+            return self.metadata
+
+        # If this gets called more than once per session we're doing something wrong
+        logging.info("Retrieving metadata from ENA")
         response = self._get_metadata_response(self.accessions, self.accession_type)
-        parsed_metadata = self._parse_metadata(response)
+        parsed_metadata = self._parse_metadata(io.StringIO(response.text))
+
         self.metadata = parsed_metadata
 
     def _get_metadata_response(
@@ -85,74 +91,32 @@ class ENAMetadata:
         else:
             return response
 
-    def _parse_metadata(self, response) -> dict[str, list[dict[str, str]]]:
+    def _parse_metadata(
+        self, metadata: io.TextIOBase
+    ) -> dict[str, list[dict[str, str]]]:
         csv.register_dialect("unix-tab", delimiter="\t")
-        reader = csv.DictReader(io.StringIO(response.text), dialect="unix-tab")
+        reader = csv.DictReader(metadata, dialect="unix-tab")
         return {row["run_accession"]: row for row in reader}
 
-    def filter_metadata(self, fields=None):
-        filtered_metadata = []
-        if self.metadata is None:
-            self.get_metadata()
-        if fields is None:
-            fields = []
-        for run, row in self.metadata.items():
-            try:
-                new_row = {field: row[field] for field in fields}
-            except KeyError as err:
-                raise ValueError(
-                    f"Invalid field in given fields: {err.args[0]}"
-                ) from None
-            else:
-                filtered_metadata.append(new_row)
-        return filtered_metadata
+    @property
+    def columns(self):
+        self.get_metadata()
+        return next(iter(self.metadata.values())).keys()
 
-    @staticmethod
-    def _validate_output_path(output_path, overwrite):
-        output_path = Path(output_path).resolve()
-        if output_path.exists():
-            if not overwrite:
-                raise ValueError(
-                    "Output filepath already exists and overwrite is set to False"
-                )
-            else:
-                os.makedirs(output_path.parent, exist_ok=True)
-        return output_path
-
-    def _validate_columns(self, columns):
-        if self.metadata is None:
-            self.get_metadata()
-
-        available_columns = next(iter(self.metadata.values())).keys()
-
-        if columns is None:
-            columns = sorted(available_columns)
-
-        invalid_columns = set(columns).difference(available_columns)
-
-        if invalid_columns:
-            raise ValueError(f"Columns not available: {sorted(invalid_columns)}")
-
-        return columns
-
-    def write_metadata_file(
-        self, output: str, overwrite: bool = False, columns: Iterable[str] = None
-    ):
-        output_path = ENAMetadata._validate_output_path(output, overwrite)
-        columns = self._validate_columns(columns)
+    def write_metadata_file(self, output_path: Path):
         csv.register_dialect("unix-tab", delimiter="\t")
-        if self.metadata is None:
-            self.get_metadata()
+        self.get_metadata()
 
-        with open(output_path, "w") as f:
+        output_file = output_path / "metadata.tsv"
+        with open(output_file, "w") as f:
             writer = csv.DictWriter(
-                f, columns, extrasaction="ignore", dialect="unix-tab"
+                f, self.columns, extrasaction="ignore", dialect="unix-tab"
             )
             writer.writeheader()
             for row in self.metadata.values():
                 writer.writerow(row)
 
-        logging.info(f"Wrote metadata to {basename(output_path)}")
+        logging.info(f"Wrote metadata to {output_file.name}")
 
     @staticmethod
     def _get_taxonomy(taxon_id):
@@ -173,66 +137,64 @@ class ENAMetadata:
         taxonomy = self._get_taxonomy(taxon_id)
         return taxonomy["taxon"]["@scientificName"]
 
-    def to_dict(self):
+    def group_by_project(self):
         studies = defaultdict(list)
-        if not self.metadata:
-            self.get_metadata()
+        self.get_metadata()
 
         for row in self.metadata.values():
             studies[row["study_accession"]].append(row)
 
         return studies
 
-    def to_excel(self, output_dir: Path):
-        """Generates one .xls file per ENA project to be fed into PathInfo legacy pipelines"""
+    # TODO now that this is a static method it might as well get moved to the Bridger
+    @staticmethod
+    def to_excel(output_dir: Path, rows: list[dict[str, str]]):
+        """Generates a .xls file to be fed into PathInfo legacy pipelines"""
 
-        studies = self.to_dict()
+        fh = FileHeader(
+            "Pathogen Informatics",
+            "PaM",
+            "path-help",
+            rows[0]["instrument_platform"],
+            rows[0]["study_title"],
+            1,
+            "18/03/2025",
+            rows[0]["study_accession"],
+        )
 
-        for study in studies.values():
-            fh = FileHeader(
-                "Pathogen Informatics",
-                "PaM",
-                "path-help",
-                study[0]["instrument_platform"],
-                study[0]["study_title"],
-                1,
-                "18/03/2025",
-                study[0]["study_accession"],
-            )
+        data = []
+        for row in rows:
+            if not row["fastq_ftp"].strip():
+                logging.warning(
+                    f"Can't find ftp for accession: {row['run_accession']}. Skipping."
+                )
+                continue
 
-            data = []
-            for row in study:
-                if not row["fastq_ftp"].strip():
+            files = row["fastq_ftp"].split(";")
+
+            if len(files) == 1:
+                filename = basename(files[0])
+                matefile = None
+            else:
+                try:
+                    filename = basename([f for f in files if "_1" in f][0])
+                    matefile = basename([f for f in files if "_2" in f][0])
+                except IndexError:
                     logging.warning(
-                        f"Can't find ftp for accession: {row['run_accession']}. Skipping."
+                        f"Can't correctly extract filename and matefile paths from row: {row}."
                     )
                     continue
 
-                files = row["fastq_ftp"].split(";")
-
-                if len(files) == 1:
-                    filename = basename(files[0])
-                    matefile = None
-                else:
-                    try:
-                        filename = basename([f for f in files if "_1" in f][0])
-                        matefile = basename([f for f in files if "_2" in f][0])
-                    except IndexError:
-                        logging.warning(
-                            f"Can't correctly extract filename and matefile paths from row: {row}."
-                        )
-                        continue
-
-                data.append(
-                    Data(
-                        filename=filename,
-                        mate_file=matefile,
-                        sample_name=row["sample_accession"],
-                        taxon=int(row["tax_id"]),
-                    )
+            data.append(
+                Data(
+                    filename=filename,
+                    mate_file=matefile,
+                    sample_name=row["sample_accession"],
+                    taxon=int(row["tax_id"]),
                 )
+            )
 
-                writer = ExcelWriter(fh, data)
+        writer = ExcelWriter(fh, data)
 
-                outfile = str(output_dir / f"{fh.study_accession_number.value}.xls")
-                writer.write(outfile)
+        outfile = str(output_dir / f"{fh.study_accession_number.value}.xls")
+        writer.write(outfile)

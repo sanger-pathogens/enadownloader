@@ -15,7 +15,7 @@ from typing import Iterable
 from urllib.error import URLError
 
 from enadownloader.enametadata import ENAMetadata
-from enadownloader.utils import ENAObject
+from enadownloader.utils import ENAFTPContainer
 
 
 class ENADownloader:
@@ -41,7 +41,7 @@ class ENADownloader:
                 new_rows = self.flatten_multivalued_ftp_attrs(row)
             except self.InvalidRow as err:
                 logging.warning(
-                    f"Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
+                    f"{self.__class__.__name__} - Found invalid metadata for run accession {row['run_accession']}. Reason: {err}. Skipping."
                 )
                 continue
             parsed_metadata.extend(new_rows)
@@ -64,9 +64,27 @@ class ENADownloader:
             rows.append(new_row)
         return rows
 
-    def get_ftp_paths(self) -> dict[str, ENAObject]:
+    def filter_metadata(self, fields=None) -> list[dict[str, str]]:
+        filtered_metadata = []
         self.metadata_obj.get_metadata()
-        filtered_metadata = self.metadata_obj.filter_metadata(
+
+        if fields is None:
+            fields = []
+
+        for row in self.metadata_obj.metadata.values():
+            try:
+                new_row = {field: row[field] for field in fields}
+            except KeyError as err:
+                raise ValueError(
+                    f"Invalid field in given fields: {err.args[0]}"
+                ) from None
+            else:
+                filtered_metadata.append(new_row)
+
+        return filtered_metadata
+
+    def get_ftp_paths(self) -> dict[str, ENAFTPContainer]:
+        filtered_metadata = self.filter_metadata(
             fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
         )
 
@@ -76,7 +94,7 @@ class ENADownloader:
 
         response_parsed = {}
         for row in ftp_metadata:
-            obj = ENAObject(
+            obj = ENAFTPContainer(
                 row["run_accession"],
                 row["study_accession"],
                 row["fastq_ftp"],
@@ -110,7 +128,7 @@ class ENADownloader:
                 # but give the users a unique value to search for
                 logging.warning(f"Download of {basename(filename)} failed entirely!")
 
-    def load_progress(self) -> set[ENAObject]:
+    def load_progress(self) -> set[ENAFTPContainer]:
         md5_passed_files = set()
         if exists(self.progress_file):
             with open(self.progress_file) as prf:
@@ -119,7 +137,7 @@ class ENADownloader:
 
                 for line in prf:
                     line = line.strip().split(",")
-                    obj = ENAObject(*line)
+                    obj = ENAFTPContainer(*line)
                     if obj.md5_passed:
                         md5_passed_files.add(obj)
 
@@ -128,7 +146,7 @@ class ENADownloader:
     def write_progress_file(self, message: str = None):
         if not exists(self.progress_file):
             with open(self.progress_file, "w") as f:
-                f.write(f"{ENAObject.header}\n")
+                f.write(f"{ENAFTPContainer.header}\n")
 
         if message is not None:
             with open(self.progress_file, "a") as f:
@@ -143,7 +161,7 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_fastqs(self, ena: ENAObject):
+    def download_fastqs(self, ena: ENAFTPContainer):
         url = "ftp://" + ena.ftp
         outfile = self.output_dir / basename(ena.ftp)
         self.wget(url, outfile)

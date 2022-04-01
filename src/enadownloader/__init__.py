@@ -47,18 +47,22 @@ def main():
     enametadata = ENAMetadata(accessions=accessions, accession_type=args.type)
 
     if args.write_metadata:
-        enametadata.write_metadata_file(
-            args.output_dir / "metadata.tsv", overwrite=True
-        )
+        enametadata.write_metadata_file(args.output_dir)
 
     # They both need folder management, so I'm grouping them together
     if args.download_files or args.write_excel:
         output_files = set()
-        for project, rows in enametadata.to_dict().items():
-            run_accessions = [row["run_accession"] for row in rows]
+        for project, rows in enametadata.group_by_project().items():
+            run_accessions = {row["run_accession"] for row in rows}
             enametadata_obj = ENAMetadata(
                 accessions=run_accessions, accession_type="run"
             )
+            # Prevents us from having to call metadata again
+            enametadata_obj.metadata = {
+                row["run_accession"]: row
+                for row in enametadata.metadata.values()
+                if row["run_accession"] in run_accessions
+            }
 
             # Do generic stuff first
             if args.create_study_folders:
@@ -73,7 +77,7 @@ def main():
 
             # Specifics
             if args.write_excel:
-                enametadata_obj.to_excel(output_dir)
+                ENAMetadata.to_excel(output_dir, rows)
 
             if args.download_files:
                 enadownloader = ENADownloader(

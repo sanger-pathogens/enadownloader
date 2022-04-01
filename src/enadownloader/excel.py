@@ -15,6 +15,9 @@ class ValueFormatClass:
         self.value = value
         self.format = format
 
+    def __repr__(self):
+        return str(self.value) or ""
+
 
 class FileHeader:
     def __init__(
@@ -144,6 +147,12 @@ class ExcelWriter:
         self.sheet: Worksheet = self.book.add_sheet("Sheet1")
 
     def write(self, filename: str):
+        if not self.data:
+            logging.warning(
+                f"{self.__class__.__name__} - Found no filepaths to write for {self.header.study_accession_number.value}. Skipping."
+            )
+            return
+
         row = self.header.write(self.sheet)
         row += 1
         self.data[0].write_header(self.sheet, row)
