@@ -56,7 +56,7 @@ class ENAFTPContainer:
             raise ValueError("study_accession cannot be None")
         try:
             value = value.strip()
-        except ValueError:
+        except AttributeError:
             raise ValueError("study_accession must be a str")
         else:
             if not value:
