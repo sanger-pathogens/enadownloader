@@ -48,16 +48,6 @@ class FileHeader:
             "Data to be kept until", date_to_keep_until
         )
 
-    @property
-    def required_columns(self):
-        return [
-            getattr(self, v).name
-            for v in dir(self)
-            if not v.startswith("_")
-            and v not in ("required_columns", self.study_accession_number.name)
-            and isinstance(getattr(self, v), ValueFormatClass)
-        ]
-
     def write(self, sheet: Worksheet):
         row = 0
         for row, header in enumerate(
@@ -124,14 +114,6 @@ class Data:
             self.comments,
         ]
 
-    @property
-    def columns(self):
-        return [fc.name for fc in self.order]
-
-    @property
-    def required_columns(self):
-        return [fc.name for fc in (self.filename, self.sample_name, self.taxon)]
-
     def write_header(self, sheet: Worksheet, row):
         for column, value in enumerate(self.order):
             sheet.write(row, column, value.name, value.format)
@@ -165,33 +147,3 @@ class ExcelWriter:
 
         self.book.save(filename)
         logging.info(f"Wrote Excel file to {basename(filename)}")
-
-
-if __name__ == "__main__":
-    header = FileHeader(
-        "Ellen Higginson",
-        "Cambridge Institute of Therapeutic Immunology & Infectious Disease CITIID",
-        "Ellen Higginson",
-        "Illumina",
-        "ParaA_Oantigen",
-        1.5,
-        "01/12/2024",
-    )
-
-    data = [
-        Data(
-            filename="813_lib566602_7871_1.fastq.gz",
-            mate_file="813_lib566602_7871_2.fastq.gz",
-            sample_name="OANT813",
-            sample_accession="",
-            taxon=54388,
-            library="OANT813",
-            fragment="",
-            read_count="",
-            base_count="",
-            comments="",
-        )
-    ]
-
-    e = ExcelWriter(header, data)
-    e.write("testexcel.xls")
