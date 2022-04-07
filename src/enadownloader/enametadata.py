@@ -76,7 +76,7 @@ class ENAMetadata:
             )
             response.raise_for_status()
         except requests.HTTPError as err:
-            if tries <= self.retries:
+            if tries < self.retries:
                 sleeptime = 2**tries
                 logging.warning(
                     f"Download of metadata failed. Reason: {err}. Retrying after {sleeptime} seconds..."
@@ -86,14 +86,12 @@ class ENAMetadata:
                     accessions, accession_type, fields, tries + 1
                 )
             else:
-                logging.error(f"Failed to download metadata (tried {tries} times)")
+                logging.error(f"Failed to download metadata (tried {tries+1} times)")
                 exit(1)
         else:
             return response
 
-    def _parse_metadata(
-        self, metadata: io.TextIOBase
-    ) -> dict[str, list[dict[str, str]]]:
+    def _parse_metadata(self, metadata: io.TextIOBase) -> dict[str, dict[str, str]]:
         csv.register_dialect("unix-tab", delimiter="\t")
         reader = csv.DictReader(metadata, dialect="unix-tab")
         return {row["run_accession"]: row for row in reader}

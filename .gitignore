@@ -8,3 +8,4 @@ __pycache__
 *.log
 results
 *.egg-info
+.DS_Store
