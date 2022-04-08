@@ -85,7 +85,7 @@ def main():
                     metadata_obj=enametadata_obj,
                     retries=args.retries,
                 )
-                asyncio.run(enadownloader.download_project_fastqs())
+                asyncio.run(enadownloader.download_all_fastqs())
                 output_files.update({ena.ftp for ena in enadownloader.load_progress()})
 
             if args.create_study_folders:

@@ -11,7 +11,6 @@ import urllib.request as urlrequest
 from os.path import basename, exists
 from pathlib import Path
 from time import sleep
-from typing import Iterable
 from urllib.error import URLError
 
 from enadownloader.enametadata import ENAMetadata
@@ -50,33 +49,34 @@ class ENADownloader:
     def flatten_multivalued_ftp_attrs(self, row) -> list[dict[str, str]]:
         if "fastq_ftp" in row and not row["fastq_ftp"].strip():
             raise self.InvalidRow("No FTP URL was found")
+
         ftp_links = row["fastq_ftp"].split(";")
         md5s = row["fastq_md5"].split(";")
+
         if len(md5s) != len(ftp_links):
             raise self.InvalidRow(
                 "The number of FTP URLs does not match the number of MD5 checksums"
             )
+
         rows = []
         for f, m in zip(ftp_links, md5s):
             new_row = row.copy()
             new_row["fastq_ftp"] = f
             new_row["fastq_md5"] = m
             rows.append(new_row)
+
         return rows
 
-    def filter_metadata(self, fields=None) -> list[dict[str, str]]:
+    def filter_metadata(self, fields: list[str]) -> list[dict[str, str]]:
         filtered_metadata = []
         self.metadata_obj.get_metadata()
-
-        if fields is None:
-            fields = []
 
         for row in self.metadata_obj.metadata.values():
             try:
                 new_row = {field: row[field] for field in fields}
             except KeyError as err:
                 raise ValueError(
-                    f"Invalid field in given fields: {err.args[0]}"
+                    f"Missing field in given fields: {err.args[0]}. Got: {list(row.keys())}"
                 ) from None
             else:
                 filtered_metadata.append(new_row)
@@ -110,7 +110,8 @@ class ENADownloader:
         return response_parsed
 
     def wget(self, url, filename, tries=0):
-        logging.info(f"Downloading {basename(filename)}")
+        filebase = basename(filename)
+        logging.info(f"Downloading {filebase}")
 
         try:
             with urlrequest.urlopen(url) as response, open(filename, "wb") as out_file:
@@ -119,14 +120,14 @@ class ENADownloader:
             if tries <= self.retries:
                 sleeptime = 2**tries
                 logging.warning(
-                    f"Download of {basename(filename)} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
+                    f"Download of {filebase} failed. Reason: {err.reason}. Retrying after {sleeptime} seconds..."
                 )
                 sleep(sleeptime)
                 self.wget(url, filename, tries + 1)
             else:
                 # We probably don't want the program to terminate upon one failure,
                 # but give the users a unique value to search for
-                logging.warning(f"Download of {basename(filename)} failed entirely!")
+                logging.warning(f"Download of {filebase} failed entirely!")
 
     def load_progress(self) -> set[ENAFTPContainer]:
         md5_passed_files = set()
@@ -161,7 +162,7 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_fastqs(self, ena: ENAFTPContainer):
+    def download_from_ftp(self, ena: ENAFTPContainer):
         url = "ftp://" + ena.ftp
         outfile = self.output_dir / basename(ena.ftp)
         self.wget(url, outfile)
@@ -170,7 +171,7 @@ class ENADownloader:
         ena.md5_passed = md5_f == ena.md5
         self.write_progress_file(str(ena))
 
-    async def download_project_fastqs(self):
+    async def download_all_fastqs(self):
         ftp_paths = self.get_ftp_paths()
 
         to_dos = [item for item in ftp_paths.values() if not item.md5_passed]
@@ -181,5 +182,5 @@ class ENADownloader:
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
         await asyncio.gather(
-            *[asyncio.to_thread(self.download_fastqs, item) for item in to_dos]
+            *[asyncio.to_thread(self.download_from_ftp, item) for item in to_dos]
         )

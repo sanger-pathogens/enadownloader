@@ -42,7 +42,7 @@ The script downloads files at a limited rate to avoid overloading the ENA FTP se
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements-test.txt -r requirements.txt -e .
+pip install -e ".[test]"
 ```
 
 ### Docker
