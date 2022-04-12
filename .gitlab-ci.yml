@@ -42,8 +42,6 @@ Test with pytest:
       - docker build -t test_image --target test .
       - docker run test_image pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
     coverage: /^.*TOTAL.+?(\d+\%)$/
-    # TODO: Remove this once we have reasonable coverage!
-    allow_failure: true
 
 Branch builds:
   stage: build
