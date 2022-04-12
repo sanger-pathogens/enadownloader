@@ -6,7 +6,7 @@ from pathlib import Path
 
 class Parser:
     @classmethod
-    def arg_parser(cls):
+    def arg_parser(cls, vargs=None):
         parser = argparse.ArgumentParser(
             prog="enadownloader",
             description=__doc__,
@@ -72,12 +72,12 @@ class Parser:
             help="Create an External Import-compatible Excel file for legacy pipelines for the given ENA accessions, stored by project",
         )
 
-        args = parser.parse_args()
+        args = parser.parse_args(vargs)
 
         # Set log_level arg
         if args.verbosity >= 2:
             args.log_level = logging.DEBUG
-        elif args.verbosity >= 1:
+        elif vargs.verbosity >= 1:
             args.log_level = logging.INFO
         else:
             args.log_level = logging.WARN

@@ -10,7 +10,7 @@ from enadownloader.enametadata import ENAMetadata
 from enadownloader.utils import AccessionValidator
 
 
-def main():
+def main(args=None):
     logfile = join(os.getcwd(), "enadownloader.log")
 
     # Set up logging
@@ -18,7 +18,7 @@ def main():
     fh.setLevel(logging.DEBUG)
     sh = logging.StreamHandler()
 
-    args = Parser.arg_parser()
+    args = Parser.arg_parser(args)
 
     # noinspection PyArgumentList
     logging.basicConfig(
