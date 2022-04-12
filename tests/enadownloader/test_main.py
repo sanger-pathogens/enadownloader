@@ -18,4 +18,4 @@ def test_main(tmp_path):
     assert Path(metadata_file).name == "metadata.tsv"
 
     files = os.listdir(project_folder)
-    assert files == ['.progress.csv', 'PRJNA560329.xls', 'SRR9984183.fastq.gz']
+    assert files == [".progress.csv", "PRJNA560329.xls", "SRR9984183.fastq.gz"]
