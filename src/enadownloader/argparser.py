@@ -77,7 +77,7 @@ class Parser:
         # Set log_level arg
         if args.verbosity >= 2:
             args.log_level = logging.DEBUG
-        elif vargs.verbosity >= 1:
+        elif args.verbosity >= 1:
             args.log_level = logging.INFO
         else:
             args.log_level = logging.WARN
