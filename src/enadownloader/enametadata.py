@@ -2,6 +2,7 @@ import csv
 import io
 import logging
 from collections import defaultdict
+from datetime import datetime
 from os.path import basename
 from pathlib import Path
 from time import sleep
@@ -86,7 +87,7 @@ class ENAMetadata:
                     accessions, accession_type, fields, tries + 1
                 )
             else:
-                logging.error(f"Failed to download metadata (tried {tries+1} times)")
+                logging.error(f"Failed to download metadata (tried {tries + 1} times)")
                 exit(1)
         else:
             return response
@@ -149,6 +150,7 @@ class ENAMetadata:
     def to_excel(output_dir: Path, rows: list[dict[str, str]]):
         """Generates a .xls file to be fed into PathInfo legacy pipelines"""
 
+        today = datetime.today()
         fh = FileHeader(
             "Pathogen Informatics",
             "PaM",
@@ -156,7 +158,7 @@ class ENAMetadata:
             rows[0]["instrument_platform"],
             rows[0]["study_title"],
             1,
-            "18/03/2025",
+            "/".join(map(str, (today.day, today.month, today.year + 10))),
             rows[0]["study_accession"],
         )
 

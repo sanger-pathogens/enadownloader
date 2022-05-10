@@ -1,22 +1,38 @@
+from datetime import datetime
 import logging
+import re
 from os.path import basename
 from typing import List, Union
 
 from xlwt import Style, Workbook, Worksheet, easyxf
 
-st = easyxf("pattern: pattern solid;")
-st.pattern.pattern_fore_colour = 50
-default = Style.default_style
+solid_green_style = easyxf("pattern: pattern solid;")
+solid_green_style.pattern.pattern_fore_colour = 50
+default_style = Style.default_style
+date_style = easyxf(num_format_str="DD/MM/YYYY")
+float_style = easyxf(num_format_str="0.00")
 
 
 class ValueFormatClass:
-    def __init__(self, name: str, value: Union[str, int], format: Style = st):
-        self.name = name
+    def __init__(self, value: Union[str, int], format: Style = default_style):
         self.value = value
         self.format = format
 
     def __repr__(self):
         return str(self.value) or ""
+
+
+class HeaderValue:
+    def __init__(self, header: ValueFormatClass, value: ValueFormatClass):
+        self.header = header
+        self.value = value
+
+    def __repr__(self):
+        return f"{self.header.value}: {self.value.value}"
+
+
+def regex_clean(value: str):
+    return re.sub(pattern=r"[^\w]+", repl=" ", string=value)
 
 
 class FileHeader:
@@ -31,26 +47,44 @@ class FileHeader:
         date_to_keep_until: str,
         study_accession_number: str = None,
     ):
-        self.supplier_name = ValueFormatClass("Supplier Name", supplier_name)
-        self.supplier_organisation = ValueFormatClass(
-            "Supplier Organisation", supplier_organisation
+        self.supplier_name = HeaderValue(
+            ValueFormatClass("Supplier Name", solid_green_style),
+            ValueFormatClass(regex_clean(supplier_name)),
         )
-        self.contact_name = ValueFormatClass("Sanger Contact Name", contact_name)
-        self.sequencing_technology = ValueFormatClass(
-            "Sequencing Technology", sequencing_technology
+        self.supplier_organisation = HeaderValue(
+            ValueFormatClass("Supplier Organisation", solid_green_style),
+            ValueFormatClass(supplier_organisation),
         )
-        self.study_name = ValueFormatClass("Study Name", study_name)
-        self.study_accession_number = ValueFormatClass(
-            "Study Accession number", study_accession_number or "", format=default
+        self.contact_name = HeaderValue(
+            ValueFormatClass("Sanger Contact Name", solid_green_style),
+            ValueFormatClass(contact_name),
         )
-        self.size = ValueFormatClass("Total size of files in GBytes", size_in_gb)
-        self.date_to_keep_until = ValueFormatClass(
-            "Data to be kept until", date_to_keep_until
+        self.sequencing_technology = HeaderValue(
+            ValueFormatClass("Sequencing Technology", solid_green_style),
+            ValueFormatClass(sequencing_technology),
+        )
+        self.study_name = HeaderValue(
+            ValueFormatClass("Study Name", solid_green_style),
+            ValueFormatClass(regex_clean(study_name)),
+        )
+        self.study_accession_number = HeaderValue(
+            ValueFormatClass("Study Accession number"),
+            ValueFormatClass(study_accession_number or ""),
+        )
+        self.size = HeaderValue(
+            ValueFormatClass("Total size of files in GBytes", solid_green_style),
+            ValueFormatClass(size_in_gb, float_style),
+        )
+        self.date_to_keep_until = HeaderValue(
+            ValueFormatClass("Data to be kept until", solid_green_style),
+            ValueFormatClass(
+                datetime.strptime(date_to_keep_until, "%d/%m/%Y"), date_style
+            ),
         )
 
     def write(self, sheet: Worksheet):
-        row = 0
-        for row, header in enumerate(
+        row_index = 0
+        for row_index, data in enumerate(
             [
                 self.supplier_name,
                 self.supplier_organisation,
@@ -62,10 +96,10 @@ class FileHeader:
                 self.date_to_keep_until,
             ]
         ):
-            sheet.write(row, 0, header.name, header.format)
-            sheet.write(row, 1, header.value)
+            sheet.write(row_index, 0, data.header.value, data.header.format)
+            sheet.write(row_index, 1, data.value.value, data.value.format)
 
-        return row + 1
+        return row_index + 1
 
 
 class Data:
@@ -82,24 +116,38 @@ class Data:
         base_count: str = None,
         comments: str = None,
     ):
-        self.filename = ValueFormatClass("Filename", value=filename)
-        self.sample_name = ValueFormatClass("Sample Name", value=sample_name)
-        self.taxon = ValueFormatClass("Taxon ID", value=taxon)
-        self.mate_file = ValueFormatClass("Mate File", format=default, value=mate_file)
-        self.sample_accession = ValueFormatClass(
-            "Sample Accession number", format=default, value=sample_accession
+        self.filename = HeaderValue(
+            ValueFormatClass("Filename", solid_green_style), ValueFormatClass(filename)
         )
-        self.library = ValueFormatClass("Library Name", format=default, value=library)
-        self.fragment = ValueFormatClass(
-            "Fragment Size", format=default, value=fragment
+        self.sample_name = HeaderValue(
+            ValueFormatClass("Sample Name", solid_green_style),
+            ValueFormatClass(sample_name),
         )
-        self.read_count = ValueFormatClass(
-            "Read Count", format=default, value=read_count
+        self.taxon = HeaderValue(
+            ValueFormatClass("Taxon ID", solid_green_style), ValueFormatClass(taxon)
         )
-        self.base_count = ValueFormatClass(
-            "Base Count", format=default, value=base_count
+        self.mate_file = HeaderValue(
+            ValueFormatClass("Mate File", default_style), ValueFormatClass(mate_file)
         )
-        self.comments = ValueFormatClass("Comments", format=default, value=comments)
+        self.sample_accession = HeaderValue(
+            ValueFormatClass("Sample Accession number", default_style),
+            ValueFormatClass(sample_accession),
+        )
+        self.library = HeaderValue(
+            ValueFormatClass("Library Name", default_style), ValueFormatClass(library)
+        )
+        self.fragment = HeaderValue(
+            ValueFormatClass("Fragment Size", default_style), ValueFormatClass(fragment)
+        )
+        self.read_count = HeaderValue(
+            ValueFormatClass("Read Count", default_style), ValueFormatClass(read_count)
+        )
+        self.base_count = HeaderValue(
+            ValueFormatClass("Base Count", default_style), ValueFormatClass(base_count)
+        )
+        self.comments = HeaderValue(
+            ValueFormatClass("Comments", default_style), ValueFormatClass(comments)
+        )
 
         self.order = [
             self.filename,
@@ -116,7 +164,7 @@ class Data:
 
     def write_header(self, sheet: Worksheet, row):
         for column, value in enumerate(self.order):
-            sheet.write(row, column, value.name, value.format)
+            sheet.write(row, column, value.header.value, value.header.format)
 
 
 class ExcelWriter:
@@ -142,7 +190,8 @@ class ExcelWriter:
 
         for r in self.data:
             for c, value in enumerate(r.order):
-                self.sheet.write(row, c, value.value)
+                # This is poetry XD
+                self.sheet.write(row, c, value.value.value, value.value.format)
             row += 1
 
         self.book.save(filename)

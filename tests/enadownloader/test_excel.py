@@ -1,3 +1,4 @@
+import datetime
 import pytest
 import xlrd
 
@@ -83,8 +84,13 @@ def test_excelwriter(excel_path, excelwriter):
     assert test_sheet.cell_value(5, 1) == "12345"
     assert test_sheet.cell_value(6, 0) == "Total size of files in GBytes"
     assert test_sheet.cell_value(6, 1) == 1.5
+    assert type(test_sheet.cell_value(6, 1)) == float
     assert test_sheet.cell_value(7, 0) == "Data to be kept until"
-    assert test_sheet.cell_value(7, 1) == "01/12/2024"
+    # excel datetime object converts to float, need to convert back to datetime for test
+    excel_date_object = test_sheet.cell_value(7, 1)
+    seconds = (excel_date_object - 25569) * 86400.0  # 25569 is an Excel defined offset
+    date = datetime.datetime.utcfromtimestamp(seconds)
+    assert date == datetime.datetime(2024, 12, 1, 0, 0)
 
     # Test empty newline
     assert test_sheet.cell_value(8, 0) == ""
