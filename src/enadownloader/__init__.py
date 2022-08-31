@@ -85,7 +85,12 @@ def main(args=None):
                     metadata_obj=enametadata_obj,
                     retries=args.retries,
                 )
-                asyncio.run(enadownloader.download_all_fastqs())
+                try:
+                    asyncio.run(enadownloader.download_all_fastqs())
+                except enadownloader.NoSuccessfulDownloads as err:
+                    logging.error(f"{err} for project {project}")
+                    exit(1)
+
                 output_files.update({ena.ftp for ena in enadownloader.load_progress()})
 
             if args.create_study_folders:
