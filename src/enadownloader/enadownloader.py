@@ -21,6 +21,9 @@ class ENADownloader:
     class InvalidRow(ValueError):
         pass
 
+    class NoSuccessfulDownloads(ValueError):
+        pass
+
     def __init__(
         self,
         metadata_obj: ENAMetadata,
@@ -109,7 +112,7 @@ class ENADownloader:
 
         return response_parsed
 
-    def wget(self, url, filename, tries=0):
+    def wget(self, url: str, filename: str, tries: int = 0) -> bool:
         filebase = basename(filename)
         logging.info(f"Downloading {filebase}")
 
@@ -128,6 +131,9 @@ class ENADownloader:
                 # We probably don't want the program to terminate upon one failure,
                 # but give the users a unique value to search for
                 logging.warning(f"Download of {filebase} failed entirely!")
+                return False
+        else:
+            return True
 
     def load_progress(self) -> set[ENAFTPContainer]:
         md5_passed_files = set()
@@ -162,14 +168,16 @@ class ENADownloader:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def download_from_ftp(self, ena: ENAFTPContainer):
+    def download_from_ftp(self, ena: ENAFTPContainer) -> bool:
         url = "ftp://" + ena.ftp
         outfile = self.output_dir / basename(ena.ftp)
-        self.wget(url, outfile)
-        md5_f = self.md5_check(outfile)
+        success = self.wget(url, outfile)
+        if success:
+            md5_f = self.md5_check(outfile)
 
-        ena.md5_passed = md5_f == ena.md5
-        self.write_progress_file(str(ena))
+            ena.md5_passed = md5_f == ena.md5
+            self.write_progress_file(str(ena))
+        return success
 
     async def download_all_fastqs(self):
         ftp_paths = self.get_ftp_paths()
@@ -181,6 +189,8 @@ class ENADownloader:
 
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
-        await asyncio.gather(
+        download_result = await asyncio.gather(
             *[asyncio.to_thread(self.download_from_ftp, item) for item in to_dos]
         )
+        if not download_result:
+            raise self.NoSuccessfulDownloads("All scheduled downloads failed")

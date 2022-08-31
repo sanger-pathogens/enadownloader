@@ -11,13 +11,13 @@ COPY setup.cfg pyproject.toml ./
 COPY src src
 
 # Setting in-tree-build as pip started complaining about a potential new feature
-RUN pip install --use-feature=in-tree-build .
+RUN pip install .
 
 FROM compile-image AS test
 
 COPY tests tests
 
-RUN pip install --use-feature=in-tree-build -e ".[test]"
+RUN pip install -e ".[test]"
 
 # Loose default for quick testing
 CMD ["pytest", "--cov", "src", "--cov-branch", "--cov-report", "term-missing", "--cov-fail-under", "80"]
