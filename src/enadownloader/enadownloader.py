@@ -192,5 +192,7 @@ class ENADownloader:
         download_result = await asyncio.gather(
             *[asyncio.to_thread(self.download_from_ftp, item) for item in to_dos]
         )
-        if not download_result:
+
+        # Raise an error if at least one download was attempted, but none were successful.
+        if download_result and not any(download_result):
             raise self.NoSuccessfulDownloads("All scheduled downloads failed")

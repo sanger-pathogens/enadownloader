@@ -1,5 +1,6 @@
 from urllib.error import URLError
 
+import asyncio
 import pytest
 from pytest_mock import MockerFixture
 
@@ -207,8 +208,6 @@ def test_download_from_ftp(downloader, mock_urlopen, output_path, ENAFTPContaine
 def test_download_all_fastqs(
     downloader, mocker, mock_urlopen, output_path, ENAFTPContainers
 ):
-    import asyncio
-
     ftp_paths = {container.key: container for container in ENAFTPContainers[:1]}
     mocker.patch.object(downloader, "get_ftp_paths", return_value=ftp_paths)
 
@@ -227,4 +226,27 @@ def test_download_all_fastqs(
         "ftp.sra.ebi.ac.uk/vol1/fastq/SRR250/001/SRR25042885/SRR25042885.fastq.gz,"
         "5fc34f3bd5a7f2696902d661d8b21981,"
         "False"
+    )
+
+
+def test_download_all_fastqs_when_all_downloads_fail(
+    downloader, mocker, mock_urlopen, output_path, ENAFTPContainers
+):
+    ftp_paths = {container.key: container for container in ENAFTPContainers[:1]}
+    mocker.patch.object(downloader, "get_ftp_paths", return_value=ftp_paths)
+
+    # Mock wget so downloads always appear to fail
+    mocker.patch.object(downloader, "wget", return_value=False)
+
+    with pytest.raises(downloader.NoSuccessfulDownloads):
+        asyncio.run(downloader.download_all_fastqs())
+
+    result_file = downloader.output_dir / "SRR25042885.fastq.gz"
+    assert not result_file.exists()
+
+    # The progress file should be empty except for the header
+    assert downloader.progress_file.exists()
+    assert (
+        downloader.progress_file.read_text().strip()
+        == "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
     )
