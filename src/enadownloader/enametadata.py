@@ -29,9 +29,12 @@ class ENAMetadata:
     @staticmethod
     def get_available_fields(result_type: str = "read_run"):
         url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
-        response = requests.get(url)
         try:
+            response = requests.get(url)
             response.raise_for_status()
+        except requests.ConnectionError as err:
+            logging.error(f"Failed to connect to ENA server. Reason: {err}.")
+            exit(1)
         except requests.HTTPError as err:
             logging.error(
                 f"Could not get available fields for ENA result type: {result_type}. Reason: {err}."
@@ -76,7 +79,7 @@ class ENAMetadata:
                 "https://www.ebi.ac.uk/ena/portal/api/search", data=post_data
             )
             response.raise_for_status()
-        except requests.HTTPError as err:
+        except (requests.ConnectionError, requests.HTTPError) as err:
             if tries < self.retries:
                 sleeptime = 2**tries
                 logging.warning(
