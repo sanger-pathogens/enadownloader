@@ -5,10 +5,10 @@ import collections
 import enadownloader.excel
 from enadownloader.enametadata import ENAMetadata
 
-
 """ Unit tests for the enametadata module """
 
 RUN_TYPE = "run"
+SAMPLE_TYPE = "sample"
 TEST_TAXON_ID = "123"
 TEST_JSON_FIELD_SET = [
     {"columnId": "study_accession", "description": "study accession number"},
@@ -121,6 +121,19 @@ def run_accessions():
 
 
 @pytest.fixture
+def sample_accessions():
+    accessions = [
+        "SAMD00002711",
+        "SRS7053897",
+        "SAMN15546073",
+        "SRS7053865",
+        "SAMD00013986",
+        "DRS000237",
+    ]
+    yield accessions
+
+
+@pytest.fixture
 def search_params(run_accessions):
     yield {
         "result": "read_run",
@@ -208,6 +221,32 @@ def test_get_metadata_response_with_retries(
     )
     # one failed call followed by 2 failed retries = 3 total......
     assert mock_search_request_error.call_count == 3
+
+
+def test_build_post_data(run_accessions):
+    """Test _build_post_data method"""
+    fields = EXPECTED_FIELD_LIST
+    post_data = ENAMetadata._build_post_data(fields, RUN_TYPE, run_accessions)
+
+    assert post_data["fields"] == ",".join(fields)
+    assert post_data["includeAccessionType"] == RUN_TYPE
+    assert post_data["includeAccessions"] == "SRR9984183,SRR13191702,ERR1160846"
+    assert "query" not in post_data or not post_data["query"]
+
+
+def test_build_post_data_with_mixed_accessions(sample_accessions):
+    """Test _build_post_data method when using a mix of secondary and non-secondary accessions"""
+    fields = EXPECTED_FIELD_LIST
+    post_data = ENAMetadata._build_post_data(fields, SAMPLE_TYPE, sample_accessions)
+
+    assert post_data["fields"] == ",".join(fields)
+    assert post_data["includeAccessionType"] == SAMPLE_TYPE
+    assert post_data["includeAccessions"] == "SAMD00002711,SAMN15546073,SAMD00013986"
+    assert (
+        post_data["query"] == 'secondary_sample_accession="SRS7053897" '
+        'OR secondary_sample_accession="SRS7053865" '
+        'OR secondary_sample_accession="DRS000237"'
+    )
 
 
 def test_parse_metadata(run_accessions):

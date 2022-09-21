@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime
 from os.path import basename
@@ -66,14 +67,7 @@ class ENAMetadata:
         """
         if fields is None:
             fields = self.get_available_fields()
-        post_data = {
-            "result": "read_run",
-            "fields": ",".join(fields),
-            "includeAccessionType": accession_type,
-            "includeAccessions": ",".join(accessions),
-            "limit": 0,
-            "format": "tsv",
-        }
+        post_data = self._build_post_data(fields, accession_type, accessions)
         try:
             response = requests.post(
                 "https://www.ebi.ac.uk/ena/portal/api/search", data=post_data
@@ -94,6 +88,38 @@ class ENAMetadata:
                 exit(1)
         else:
             return response
+
+    @staticmethod
+    def _build_post_data(fields, accession_type, accessions):
+        post_data = {
+            "result": "read_run",
+            "fields": ",".join(fields),
+            "limit": 0,
+            "format": "tsv",
+        }
+
+        # See https://ena-docs.readthedocs.io/en/latest/submit/general-guide/accessions.html
+        # and https://regex101.com/r/W0ldhu/1
+        secondary_regex = re.compile("^(?:[EDS]RP|[EDS]RS)[0-9]{6,}$")
+
+        primary, secondary = [], []
+        for accession in accessions:
+            if secondary_regex.fullmatch(accession):
+                secondary.append(accession)
+            else:
+                primary.append(accession)
+
+        if primary:
+            post_data["includeAccessionType"] = accession_type
+            post_data["includeAccessions"] = ",".join(primary)
+
+        if secondary:
+            query_key = f"secondary_{accession_type}_accession"  # E.g. secondary_sample_accession
+            post_data["query"] = " OR ".join(
+                f'{query_key}="{accession}"' for accession in secondary
+            )
+
+        return post_data
 
     def _parse_metadata(self, metadata: io.TextIOBase) -> dict[str, dict[str, str]]:
         csv.register_dialect("unix-tab", delimiter="\t")
