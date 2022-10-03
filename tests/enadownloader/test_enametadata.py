@@ -287,7 +287,6 @@ def test_write_metadata_file(
 def test_get_taxonomy(mock_taxonomy_request):
     """Test _get_taxonomy method"""
     result = ENAMetadata._get_taxonomy(TEST_TAXON_ID)
-    assert isinstance(result, collections.OrderedDict)
     # Pick a few values to check...
     assert result["taxon"]["@scientificName"] == "Pirellula"
     assert result["taxon"]["@taxId"] == TEST_TAXON_ID
