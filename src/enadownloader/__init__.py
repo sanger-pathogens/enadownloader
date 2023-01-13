@@ -84,6 +84,7 @@ def main(args=None):
                     output_dir=output_dir,
                     metadata_obj=enametadata_obj,
                     retries=args.retries,
+                    log_full_path=args.log_full_path,
                 )
                 try:
                     asyncio.run(enadownloader.download_all_fastqs())

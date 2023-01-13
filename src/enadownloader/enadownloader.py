@@ -29,10 +29,12 @@ class ENADownloader:
         metadata_obj: ENAMetadata,
         output_dir: Path,
         retries: int = 5,
+        log_full_path: bool = False,
     ):
+        self.metadata_obj = metadata_obj
         self.output_dir = output_dir
         self.retries = retries
-        self.metadata_obj = metadata_obj
+        self.log_full_path = log_full_path
 
         self.progress_file = self.output_dir / ".progress.csv"
 
@@ -105,7 +107,9 @@ class ENADownloader:
             )
 
             if obj in md5_passed_files:
-                logging.info(f"{basename(obj.ftp)} already exists. Skipping.")
+                base = basename(obj.ftp)
+                path = base if not self.log_full_path else self.output_dir / base
+                logging.info("%s already exists. Skipping.", path)
                 continue
 
             response_parsed[obj.key] = obj
@@ -133,6 +137,10 @@ class ENADownloader:
                 logging.warning(f"Download of {filebase} failed entirely!")
                 return False
         else:
+            if self.log_full_path:
+                logging.info(f"{filename} downloaded")
+            else:
+                logging.info(f"{filebase} downloaded")
             return True
 
     def load_progress(self) -> set[ENAFTPContainer]:
