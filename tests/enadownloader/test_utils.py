@@ -16,24 +16,6 @@ TEST_MD5 = "0b512d2dc31685983456bd56fd836544"
 
 
 @pytest.fixture
-def run_accessions():
-    accessions = ["SRR25042885", "ERR25042885", "DRR25042885"]
-    yield accessions
-
-
-@pytest.fixture
-def sample_accessions():
-    accessions = ["ERS25042885", "DRS25042885", "SRS25042885", "SAM25042885"]
-    yield accessions
-
-
-@pytest.fixture
-def study_accessions():
-    accessions = ["SRP25042885", "ERP25042885", "DRP25042885", "PRJ25042885"]
-    yield accessions
-
-
-@pytest.fixture
 def illegal_accessions():
     accessions = ["illegal1", "illegal2", "illegal3", "illegal4"]
     yield accessions

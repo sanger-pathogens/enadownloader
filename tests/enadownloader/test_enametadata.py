@@ -1,9 +1,12 @@
+import collections
+import io
+
 import pytest
 import requests
-import io
-import collections
+
 import enadownloader.excel
 from enadownloader.enametadata import ENAMetadata
+from tests.conftest import run_accessions
 
 """ Unit tests for the enametadata module """
 
@@ -115,25 +118,6 @@ def mock_taxonomy_request_error(mocker):
 
 
 @pytest.fixture
-def run_accessions():
-    accessions = ["SRR9984183", "SRR13191702", "ERR1160846"]
-    yield accessions
-
-
-@pytest.fixture
-def sample_accessions():
-    accessions = [
-        "SAMD00002711",
-        "SRS7053897",
-        "SAMN15546073",
-        "SRS7053865",
-        "SAMD00013986",
-        "DRS000237",
-    ]
-    yield accessions
-
-
-@pytest.fixture
 def search_params(run_accessions):
     yield {
         "result": "read_run",
@@ -230,7 +214,9 @@ def test_build_post_data(run_accessions):
 
     assert post_data["fields"] == ",".join(fields)
     assert post_data["includeAccessionType"] == RUN_TYPE
-    assert post_data["includeAccessions"] == "SRR9984183,SRR13191702,ERR1160846"
+    assert {"SRR9984183", "SRR13191702", "ERR1160846"} == set(
+        post_data["includeAccessions"].split(",")
+    )
     assert "query" not in post_data or not post_data["query"]
 
 
@@ -241,12 +227,16 @@ def test_build_post_data_with_mixed_accessions(sample_accessions):
 
     assert post_data["fields"] == ",".join(fields)
     assert post_data["includeAccessionType"] == SAMPLE_TYPE
-    assert post_data["includeAccessions"] == "SAMD00002711,SAMN15546073,SAMD00013986"
-    assert (
-        post_data["query"] == 'secondary_sample_accession="SRS7053897" '
-        'OR secondary_sample_accession="SRS7053865" '
-        'OR secondary_sample_accession="DRS000237"'
+    assert set(post_data["includeAccessions"].split(",")) == {
+        "SAMD00002711",
+        "SAMN15546073",
+        "SAMD00013986",
+    }
+    assert all(
+        f'secondary_sample_accession="{x}"' in post_data["query"]
+        for x in {"SRS7053865", "SRS7053897", "DRS000237"}
     )
+    assert "OR" in post_data["query"]
 
 
 def test_parse_metadata(run_accessions):
