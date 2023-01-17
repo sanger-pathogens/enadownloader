@@ -31,16 +31,13 @@ def main(args=None):
     logging.info(f"Absolute output folder path: {args.output_dir.resolve()}")
 
     with open(args.input) as f:
-        accessions = set()
-        for line in f:
-            accession = line.strip()
-            accessions.add(accession)
+        accessions = {l.strip() for l in f}
 
     logging.debug(f"Checking accession validity...")
-    valid_accessions = AccessionValidator.parse_accessions(
+    accessions = AccessionValidator.parse_accessions(
         accessions=accessions, accession_type=args.type
     )
-    if not valid_accessions:
+    if not accessions:
         logging.fatal("No valid accessions provided")
         exit(1)
 

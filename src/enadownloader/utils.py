@@ -147,7 +147,7 @@ class AccessionValidator:
 
     @classmethod
     def parse_accessions(cls, accessions, accession_type="run"):
-        parsed_accessions = []
+        parsed_accessions = set()
         for accession in accessions:
             try:
                 cls.validate_accession(accession, accession_type)
@@ -155,5 +155,5 @@ class AccessionValidator:
                 logging.warning(f"{err}. Skipping...")
                 continue
             else:
-                parsed_accessions.append(accession)
+                parsed_accessions.add(accession)
         return parsed_accessions

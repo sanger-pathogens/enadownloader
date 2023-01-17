@@ -80,3 +80,28 @@ def mock_urlopen(mocker):
     mocked = mocker.patch.object(urlrequest, "urlopen")
     mocked.return_value = BytesIO(b"I am a fastq file")
     yield mocked
+
+
+@pytest.fixture
+def run_accessions():
+    accessions = {"SRR9984183", "SRR13191702", "ERR1160846"}
+    yield accessions
+
+
+@pytest.fixture
+def sample_accessions():
+    accessions = {
+        "SAMD00002711",
+        "SRS7053897",
+        "SAMN15546073",
+        "SRS7053865",
+        "SAMD00013986",
+        "DRS000237",
+    }
+    yield accessions
+
+
+@pytest.fixture
+def study_accessions():
+    accessions = {"SRP25042885", "ERP25042885", "DRP25042885", "PRJ25042885"}
+    yield accessions
