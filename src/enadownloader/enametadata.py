@@ -29,7 +29,7 @@ class ENAMetadata:
 
     @staticmethod
     def get_available_fields(result_type: str = "read_run"):
-        url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
+        url = f"https://www.dev.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -70,7 +70,7 @@ class ENAMetadata:
         post_data = self._build_post_data(fields, accession_type, accessions)
         try:
             response = requests.post(
-                "https://www.ebi.ac.uk/ena/portal/api/search", data=post_data
+                "https://www.dev.ebi.ac.uk/ena/portal/api/search", data=post_data
             )
             response.raise_for_status()
         except (requests.ConnectionError, requests.HTTPError) as err:
@@ -148,7 +148,7 @@ class ENAMetadata:
 
     @staticmethod
     def _get_taxonomy(taxon_id):
-        url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
+        url = f"https://www.dev.ebi.ac.uk/ena/portal/api/xml/{taxon_id}"
         try:
             response = requests.get(url)
             response.raise_for_status()
