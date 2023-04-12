@@ -64,9 +64,10 @@ EXPECTED_FIELD_LIST = [
     "secondary_sample_accession",
     "run_accession",
 ]
-EXPECTED_FIELDS_URL = "https://wwwdev.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result="
-EXPECTED_SEARCH_URL = "https://wwwdev.ebi.ac.uk/ena/portal/api/search"
-EXPECTED_TAXONOMY_URL = "https://wwwdev.ebi.ac.uk/ena/browser/api/xml/"
+API_ENDPOINT = "https://www.ebi.ac.uk/ena/portal/api/"
+EXPECTED_FIELDS_URL = f"{API_ENDPOINT}returnFields?dataPortal=ena&format=json&result="
+EXPECTED_SEARCH_URL = f"{API_ENDPOINT}search"
+EXPECTED_TAXONOMY_URL = f"{API_ENDPOINT}xml/"
 
 
 @pytest.fixture
