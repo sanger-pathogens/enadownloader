@@ -69,9 +69,7 @@ class ENAMetadata:
             fields = self.get_available_fields()
         post_data = self._build_post_data(fields, accession_type, accessions)
         try:
-            response = requests.post(
-                f"{self.api_link}/search", data=post_data
-            )
+            response = requests.post(f"{self.api_link}/search", data=post_data)
             response.raise_for_status()
         except (requests.ConnectionError, requests.HTTPError) as err:
             if tries < self.retries:
