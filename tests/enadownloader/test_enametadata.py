@@ -64,9 +64,10 @@ EXPECTED_FIELD_LIST = [
     "secondary_sample_accession",
     "run_accession",
 ]
-EXPECTED_FIELDS_URL = "https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result="
-EXPECTED_SEARCH_URL = "https://www.ebi.ac.uk/ena/portal/api/search"
-EXPECTED_TAXONOMY_URL = "https://www.ebi.ac.uk/ena/browser/api/xml/"
+API_ENDPOINT = "https://www.ebi.ac.uk/ena/portal/api"
+EXPECTED_FIELDS_URL = f"{API_ENDPOINT}/returnFields?dataPortal=ena&format=json&result="
+EXPECTED_SEARCH_URL = f"{API_ENDPOINT}/search"
+EXPECTED_TAXONOMY_URL = f"{API_ENDPOINT}/xml/"
 
 
 @pytest.fixture
@@ -149,14 +150,16 @@ def test_path(tmp_path):
 
 def test_get_available_fields_success(mock_fields_request):
     """Test the get_available_fields method"""
-    assert ENAMetadata.get_available_fields("read_run") == EXPECTED_FIELD_LIST
+    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    assert metadata_obj.get_available_fields("read_run") == EXPECTED_FIELD_LIST
     mock_fields_request.assert_called_with(f"{EXPECTED_FIELDS_URL}read_run")
 
 
 def test_get_available_fields_fail(mock_fields_request_error):
     """Test the get_available_fields method when an HTTP error is encountered"""
+    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
     with pytest.raises(SystemExit) as e:
-        ENAMetadata.get_available_fields("read_run")
+        metadata_obj.get_available_fields("read_run")
 
 
 def test_get_metadata(
@@ -276,7 +279,8 @@ def test_write_metadata_file(
 
 def test_get_taxonomy(mock_taxonomy_request):
     """Test _get_taxonomy method"""
-    result = ENAMetadata._get_taxonomy(TEST_TAXON_ID)
+    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    result = metadata_obj._get_taxonomy(TEST_TAXON_ID)
     # Pick a few values to check...
     assert result["taxon"]["@scientificName"] == "Pirellula"
     assert result["taxon"]["@taxId"] == TEST_TAXON_ID
@@ -287,8 +291,9 @@ def test_get_taxonomy(mock_taxonomy_request):
 
 def test_get_taxonomy_failed(mock_taxonomy_request_error):
     """Test _get_taxonomy method failed ENA connection"""
+    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
     with pytest.raises(SystemExit) as e:
-        ENAMetadata._get_taxonomy(TEST_TAXON_ID)
+        metadata_obj._get_taxonomy(TEST_TAXON_ID)
 
 
 def test_get_scientific_name(mock_taxonomy_request):

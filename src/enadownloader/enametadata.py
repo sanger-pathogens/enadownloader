@@ -26,10 +26,10 @@ class ENAMetadata:
         self.accession_type = accession_type
         self.retries = retries
         self.metadata = None
+        self.api_link = "https://www.ebi.ac.uk/ena/portal/api"
 
-    @staticmethod
-    def get_available_fields(result_type: str = "read_run"):
-        url = f"https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&format=json&result={result_type}"
+    def get_available_fields(self, result_type: str = "read_run"):
+        url = f"{self.api_link}/returnFields?dataPortal=ena&format=json&result={result_type}"
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -69,9 +69,7 @@ class ENAMetadata:
             fields = self.get_available_fields()
         post_data = self._build_post_data(fields, accession_type, accessions)
         try:
-            response = requests.post(
-                "https://www.ebi.ac.uk/ena/portal/api/search", data=post_data
-            )
+            response = requests.post(f"{self.api_link}/search", data=post_data)
             response.raise_for_status()
         except (requests.ConnectionError, requests.HTTPError) as err:
             if tries < self.retries:
@@ -146,9 +144,8 @@ class ENAMetadata:
 
         logging.info(f"Wrote metadata to {output_file.name}")
 
-    @staticmethod
-    def _get_taxonomy(taxon_id):
-        url = f"https://www.ebi.ac.uk/ena/browser/api/xml/{taxon_id}"
+    def _get_taxonomy(self, taxon_id):
+        url = f"{self.api_link}/xml/{taxon_id}"
         try:
             response = requests.get(url)
             response.raise_for_status()
