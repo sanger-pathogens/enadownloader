@@ -85,7 +85,7 @@ class ENAMetadata:
                 logging.error(f"Failed to download metadata (tried {tries + 1} times)")
                 exit(1)
         else:
-            response.encoding = 'UTF-8'
+            response.encoding = "UTF-8"
             return response
 
     @staticmethod
