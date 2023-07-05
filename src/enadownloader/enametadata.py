@@ -68,8 +68,8 @@ class ENAMetadata:
         if fields is None:
             fields = self.get_available_fields()
         post_data = self._build_post_data(fields, accession_type, accessions)
+        response = requests.post(f"{self.api_link}/search", data=post_data)
         try:
-            response = requests.post(f"{self.api_link}/search", data=post_data)
             response.raise_for_status()
         except (requests.ConnectionError, requests.HTTPError) as err:
             if tries < self.retries:
@@ -85,6 +85,7 @@ class ENAMetadata:
                 logging.error(f"Failed to download metadata (tried {tries + 1} times)")
                 exit(1)
         else:
+            response.encoding = 'UTF-8'
             return response
 
     @staticmethod
