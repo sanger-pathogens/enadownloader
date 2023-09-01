@@ -30,11 +30,13 @@ class ENADownloader:
         output_dir: Path,
         retries: int = 5,
         log_full_path: bool = False,
+        cache: bool = True
     ):
         self.metadata_obj = metadata_obj
         self.output_dir = output_dir
         self.retries = retries
         self.log_full_path = log_full_path
+        self.cache = cache
 
         self.progress_file = self.output_dir / ".progress.csv"
 
@@ -93,7 +95,7 @@ class ENADownloader:
             fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
         )
 
-        md5_passed_files = self.load_progress()
+        md5_passed_files = self.load_progress() if self.cache else {}
 
         ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
 
