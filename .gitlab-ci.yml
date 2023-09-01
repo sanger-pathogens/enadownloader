@@ -20,6 +20,7 @@ stages:
   - export IMAGE="${CI_REGISTRY_IMAGE}:${TAG}"
   - echo "🐳 Building ${IMAGE} 🐳"
   - docker build --no-cache -t "${IMAGE}" --target runner .
+  - docker run ${IMAGE} enadownloader -h  # Just check that help works, catch docker build issues early
   - echo "🐳 Pushing ${IMAGE} 🐳"
   - docker push ${IMAGE}
 
