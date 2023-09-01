@@ -152,6 +152,12 @@ def test_load_progress_when_file_is_downloaded_but_not_md5passed(downloader):
     assert len(result) == 0
 
 
+def test_load_progress_without_cache_returns_empty_set(downloader):
+    downloader.cache = False
+    result = downloader.load_progress()
+    assert len(result) == 0
+
+
 def test_write_progress_file_creates_file_when_it_doesnt_exist_yet(downloader):
     assert not downloader.progress_file.exists()
     downloader.write_progress_file()

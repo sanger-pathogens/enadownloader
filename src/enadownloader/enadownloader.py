@@ -30,11 +30,13 @@ class ENADownloader:
         output_dir: Path,
         retries: int = 5,
         log_full_path: bool = False,
+        cache: bool = True,
     ):
         self.metadata_obj = metadata_obj
         self.output_dir = output_dir
         self.retries = retries
         self.log_full_path = log_full_path
+        self.cache = cache
 
         self.progress_file = self.output_dir / ".progress.csv"
 
@@ -145,16 +147,17 @@ class ENADownloader:
 
     def load_progress(self) -> set[ENAFTPContainer]:
         md5_passed_files = set()
-        if exists(self.progress_file):
-            with open(self.progress_file) as prf:
-                # skip header
-                prf.readline()
+        if self.cache:
+            if exists(self.progress_file):
+                with open(self.progress_file) as prf:
+                    # skip header
+                    prf.readline()
 
-                for line in prf:
-                    line = line.strip().split(",")
-                    obj = ENAFTPContainer(*line)
-                    if obj.md5_passed:
-                        md5_passed_files.add(obj)
+                    for line in prf:
+                        line = line.strip().split(",")
+                        obj = ENAFTPContainer(*line)
+                        if obj.md5_passed:
+                            md5_passed_files.add(obj)
 
         return md5_passed_files
 

@@ -80,6 +80,11 @@ class Parser:
             action="store_true",
             help="Outputs full filepath to log file. Not recommended unless the log file gets parsed downstream",
         )
+        optional.add_argument(
+            "--no-cache",
+            action="store_true",
+            help="Ignores the .progress.csv files when downloading",
+        )
         args = parser.parse_args(vargs)
 
         # Set log_level arg
