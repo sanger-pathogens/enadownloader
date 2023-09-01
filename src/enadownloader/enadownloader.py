@@ -30,7 +30,7 @@ class ENADownloader:
         output_dir: Path,
         retries: int = 5,
         log_full_path: bool = False,
-        cache: bool = True
+        cache: bool = True,
     ):
         self.metadata_obj = metadata_obj
         self.output_dir = output_dir
