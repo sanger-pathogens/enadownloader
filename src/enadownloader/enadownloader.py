@@ -95,7 +95,7 @@ class ENADownloader:
             fields=("run_accession", "study_accession", "fastq_ftp", "fastq_md5")
         )
 
-        md5_passed_files = self.load_progress() if self.cache else {}
+        md5_passed_files = self.load_progress()
 
         ftp_metadata = self.parse_ftp_metadata(filtered_metadata)
 
@@ -147,16 +147,17 @@ class ENADownloader:
 
     def load_progress(self) -> set[ENAFTPContainer]:
         md5_passed_files = set()
-        if exists(self.progress_file):
-            with open(self.progress_file) as prf:
-                # skip header
-                prf.readline()
+        if self.cache:
+            if exists(self.progress_file):
+                with open(self.progress_file) as prf:
+                    # skip header
+                    prf.readline()
 
-                for line in prf:
-                    line = line.strip().split(",")
-                    obj = ENAFTPContainer(*line)
-                    if obj.md5_passed:
-                        md5_passed_files.add(obj)
+                    for line in prf:
+                        line = line.strip().split(",")
+                        obj = ENAFTPContainer(*line)
+                        if obj.md5_passed:
+                            md5_passed_files.add(obj)
 
         return md5_passed_files
 
