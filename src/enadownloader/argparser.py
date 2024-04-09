@@ -65,8 +65,9 @@ class Parser:
         optional.add_argument(
             "-d",
             "--download-files",
-            action="store_true",
-            help="Download fastq files for the given ENA accessions",
+            default="fastq",
+            choices=["fastq", "submitted"],
+            help="Download fastq or submitted files for the given ENA accessions",
         )
         optional.add_argument(
             "-e",
