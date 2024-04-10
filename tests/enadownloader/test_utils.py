@@ -156,11 +156,11 @@ def test_enaftpcontainer_equals(enaftpcontainer):
 
 
 def test_validate_accession_for_valid_accessions(
-    run_accessions, sample_accessions, study_accessions
+    fastq_run_accessions, sample_accessions, study_accessions
 ):
     """Test the AccessionValidator validate_accession method with valid accessions"""
     try:
-        for accession in run_accessions:
+        for accession in fastq_run_accessions:
             AccessionValidator.validate_accession(accession, RUN_TYPE)
         for accession in sample_accessions:
             AccessionValidator.validate_accession(accession, SAMPLE_TYPE)
@@ -187,13 +187,13 @@ def test_validate_accession_for_invalid_accessions():
 
 
 def test_parse_accessions_for_valid_accessions(
-    run_accessions, sample_accessions, study_accessions
+    fastq_run_accessions, sample_accessions, study_accessions
 ):
     """Test the AccessionValidator parse_accessions method with valid accessions"""
     try:
         assert (
-            AccessionValidator.parse_accessions(run_accessions, RUN_TYPE)
-            == run_accessions
+            AccessionValidator.parse_accessions(fastq_run_accessions, RUN_TYPE)
+            == fastq_run_accessions
         )
         assert (
             AccessionValidator.parse_accessions(sample_accessions, SAMPLE_TYPE)
@@ -207,11 +207,15 @@ def test_parse_accessions_for_valid_accessions(
         pytest.fail("Unexpected error raised: " + str(e))
 
 
-def test_parse_accessions_for_invalid_accessions(run_accessions, illegal_accessions):
+def test_parse_accessions_for_invalid_accessions(
+    fastq_run_accessions, illegal_accessions
+):
     """Test the AccessionValidator parse_accessions method with invalid accessions"""
     assert len(AccessionValidator.parse_accessions(illegal_accessions, RUN_TYPE)) == 0
     assert (
         len(AccessionValidator.parse_accessions(illegal_accessions, SAMPLE_TYPE)) == 0
     )
     assert len(AccessionValidator.parse_accessions(illegal_accessions, STUDY_TYPE)) == 0
-    assert len(AccessionValidator.parse_accessions(run_accessions, "illegal")) == 0
+    assert (
+        len(AccessionValidator.parse_accessions(fastq_run_accessions, "illegal")) == 0
+    )

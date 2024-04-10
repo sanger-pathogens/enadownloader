@@ -12,7 +12,7 @@ def strtobool(val: str):
 
 
 class ENAFTPContainer:
-    header = "run_accession,study_accession,fastq_ftp,fastq_md5,md5_passed"
+    header = "run_accession,study_accession,ftp,md5,md5_passed"
 
     def __init__(
         self,
@@ -79,23 +79,6 @@ class ENAFTPContainer:
             if not value:
                 raise ValueError("ftp must not be an empty str")
         self._ftp = value
-
-    @property
-    def submitted(self):
-        return self._submitted
-
-    @ftp.setter
-    def submitted(self, value):
-        if value is None:
-            raise ValueError("submitted cannot be None")
-        try:
-            value = value.strip()
-        except AttributeError:
-            raise ValueError("submitted must be a str")
-        else:
-            if not value:
-                raise ValueError("submitted must not be an empty str")
-        self._submitted = value
 
     @property
     def md5(self):

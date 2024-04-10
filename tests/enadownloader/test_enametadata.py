@@ -6,7 +6,7 @@ import requests
 
 import enadownloader.excel
 from enadownloader.enametadata import ENAMetadata
-from tests.conftest import run_accessions
+from tests.conftest import fastq_run_accessions
 
 """ Unit tests for the enametadata module """
 
@@ -119,12 +119,12 @@ def mock_taxonomy_request_error(mocker):
 
 
 @pytest.fixture
-def search_params(run_accessions):
+def search_params(fastq_run_accessions):
     yield {
         "result": "read_run",
         "fields": ",".join(EXPECTED_FIELD_LIST),
         "includeAccessionType": RUN_TYPE,
-        "includeAccessions": ",".join(run_accessions),
+        "includeAccessions": ",".join(fastq_run_accessions),
         "limit": 0,
         "format": "tsv",
     }
@@ -150,20 +150,20 @@ def test_path(tmp_path):
 
 def test_get_available_fields_success(mock_fields_request):
     """Test the get_available_fields method"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     assert metadata_obj.get_available_fields("read_run") == EXPECTED_FIELD_LIST
     mock_fields_request.assert_called_with(f"{EXPECTED_FIELDS_URL}read_run")
 
 
 def test_get_available_fields_fail(mock_fields_request_error):
     """Test the get_available_fields method when an HTTP error is encountered"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     with pytest.raises(SystemExit) as e:
         metadata_obj.get_available_fields("read_run")
 
 
 def test_get_metadata(
-    mocker, run_accessions, mock_search_request, mock_get_metadata_return_data
+    mocker, fastq_run_accessions, mock_search_request, mock_get_metadata_return_data
 ):
     """Test get_metadata method"""
     # Given
@@ -172,10 +172,10 @@ def test_get_metadata(
     )
     get_metadata_response_mock.return_value.text = TEST_SEARCH_FIELDS
     # When
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE, 2)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE, 2)
     metadata_obj.get_metadata()
     # Then
-    get_metadata_response_mock.assert_called_once_with(run_accessions, RUN_TYPE)
+    get_metadata_response_mock.assert_called_once_with(fastq_run_accessions, RUN_TYPE)
     assert metadata_obj.metadata == mock_get_metadata_return_data
     # Additionally, test caching
     metadata_obj.get_metadata()
@@ -183,11 +183,15 @@ def test_get_metadata(
 
 
 def test_get_metadata_response(
-    mocker, mock_fields_request, mock_search_request, search_params, run_accessions
+    mocker,
+    mock_fields_request,
+    mock_search_request,
+    search_params,
+    fastq_run_accessions,
 ):
     """Test _get_metadata_response method"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
-    response = metadata_obj._get_metadata_response(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
+    response = metadata_obj._get_metadata_response(fastq_run_accessions, RUN_TYPE)
     mock_search_request.assert_called_once_with(EXPECTED_SEARCH_URL, data=search_params)
     assert response.text == TEST_SEARCH_FIELDS
 
@@ -197,12 +201,12 @@ def test_get_metadata_response_with_retries(
     mock_fields_request,
     mock_search_request_error,
     search_params,
-    run_accessions,
+    fastq_run_accessions,
 ):
     """Test _get_metadata_response method for error handling and retries"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE, 2)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE, 2)
     with pytest.raises(SystemExit) as e:
-        metadata_obj._get_metadata_response(run_accessions, RUN_TYPE)
+        metadata_obj._get_metadata_response(fastq_run_accessions, RUN_TYPE)
     mock_search_request_error.assert_called_with(
         EXPECTED_SEARCH_URL, data=search_params
     )
@@ -210,10 +214,10 @@ def test_get_metadata_response_with_retries(
     assert mock_search_request_error.call_count == 3
 
 
-def test_build_post_data(run_accessions):
+def test_build_post_data(fastq_run_accessions):
     """Test _build_post_data method"""
     fields = EXPECTED_FIELD_LIST
-    post_data = ENAMetadata._build_post_data(fields, RUN_TYPE, run_accessions)
+    post_data = ENAMetadata._build_post_data(fields, RUN_TYPE, fastq_run_accessions)
 
     assert post_data["fields"] == ",".join(fields)
     assert post_data["includeAccessionType"] == RUN_TYPE
@@ -242,9 +246,9 @@ def test_build_post_data_with_mixed_accessions(sample_accessions):
     assert "OR" in post_data["query"]
 
 
-def test_parse_metadata(run_accessions):
+def test_parse_metadata(fastq_run_accessions):
     """Test _parse_metadata method"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     input_data = (
         "run_accession	study_accession\nDRR028935\tPRJDB3420\nSRR9983610\tPRJNA560329"
     )
@@ -259,7 +263,7 @@ def test_write_metadata_file(
 ):
     """Test write_metadata_file method"""
     # Given
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     mock_get_metadata = mocker.patch.object(ENAMetadata, "get_metadata")
     metadata_obj.metadata = mock_get_metadata_return_data
     mock_get_metadata.return_value = mock_get_metadata_return_data
@@ -279,7 +283,7 @@ def test_write_metadata_file(
 
 def test_get_taxonomy(mock_taxonomy_request):
     """Test _get_taxonomy method"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     result = metadata_obj._get_taxonomy(TEST_TAXON_ID)
     # Pick a few values to check...
     assert result["taxon"]["@scientificName"] == "Pirellula"
@@ -291,21 +295,21 @@ def test_get_taxonomy(mock_taxonomy_request):
 
 def test_get_taxonomy_failed(mock_taxonomy_request_error):
     """Test _get_taxonomy method failed ENA connection"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     with pytest.raises(SystemExit) as e:
         metadata_obj._get_taxonomy(TEST_TAXON_ID)
 
 
 def test_get_scientific_name(mock_taxonomy_request):
     """Test get_scientific_name method"""
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     assert metadata_obj.get_scientific_name(TEST_TAXON_ID) == "Pirellula"
 
 
-def test_group_by_project(mocker, run_accessions, mock_get_metadata_return_data):
+def test_group_by_project(mocker, fastq_run_accessions, mock_get_metadata_return_data):
     """Test group_by_project method"""
     # Given
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     mock_get_metadata = mocker.patch.object(ENAMetadata, "get_metadata")
     metadata_obj.metadata = mock_get_metadata_return_data
     mock_get_metadata.return_value = mock_get_metadata_return_data
@@ -329,10 +333,10 @@ def test_group_by_project(mocker, run_accessions, mock_get_metadata_return_data)
 
 
 # TODO Add checks to to ensure that the ExcelWriter input params are correct in this test
-def test_to_excel(mocker, run_accessions, test_path):
+def test_to_excel(mocker, fastq_run_accessions, test_path):
     """Test to_excel method"""
     # Given
-    metadata_obj = ENAMetadata(run_accessions, RUN_TYPE)
+    metadata_obj = ENAMetadata(fastq_run_accessions, RUN_TYPE)
     mocker_writer = mocker.patch.object(
         enadownloader.excel.ExcelWriter, "__init__", return_value=None
     )
