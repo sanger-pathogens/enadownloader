@@ -217,7 +217,7 @@ def test_download_all_fastqs(
     ftp_paths = {container.key: container for container in ENAFTPContainers[:1]}
     mocker.patch.object(downloader, "get_ftp_paths", return_value=ftp_paths)
 
-    asyncio.run(downloader.download_all_fastqs())
+    asyncio.run(downloader.download_all_files())
 
     result_file = downloader.output_dir / "SRR25042885.fastq.gz"
     assert result_file.exists()
@@ -245,7 +245,7 @@ def test_download_all_fastqs_when_all_downloads_fail(
     mocker.patch.object(downloader, "wget", return_value=False)
 
     with pytest.raises(downloader.NoSuccessfulDownloads):
-        asyncio.run(downloader.download_all_fastqs())
+        asyncio.run(downloader.download_all_files())
 
     result_file = downloader.output_dir / "SRR25042885.fastq.gz"
     assert not result_file.exists()

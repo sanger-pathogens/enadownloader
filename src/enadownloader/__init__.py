@@ -47,7 +47,7 @@ def main(args=None):
         enametadata.write_metadata_file(args.output_dir)
 
     # They both need folder management, so I'm grouping them together
-    if args.download_files == "fastq" or args.write_excel:
+    if args.download_files or args.write_excel:
         output_files = set()
         for project, rows in enametadata.group_by_project().items():
             run_accessions = {row["run_accession"] for row in rows}
@@ -85,7 +85,7 @@ def main(args=None):
                     cache=not args.no_cache,
                 )
                 try:
-                    asyncio.run(enadownloader.download_all_fastqs())
+                    asyncio.run(enadownloader.download_all_files(args.download_files))
                 except enadownloader.NoSuccessfulDownloads as err:
                     logging.error(f"{err} for project {project}")
                     exit(1)

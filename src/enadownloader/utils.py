@@ -81,6 +81,23 @@ class ENAFTPContainer:
         self._ftp = value
 
     @property
+    def submitted(self):
+        return self._submitted
+
+    @ftp.setter
+    def submitted(self, value):
+        if value is None:
+            raise ValueError("submitted cannot be None")
+        try:
+            value = value.strip()
+        except AttributeError:
+            raise ValueError("submitted must be a str")
+        else:
+            if not value:
+                raise ValueError("submitted must not be an empty str")
+        self._submitted = value
+
+    @property
     def md5(self):
         return self._md5
 
