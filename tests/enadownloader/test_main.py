@@ -82,7 +82,7 @@ def _test_main(tmp_path, accessions, accession_type, file_type, expected):
             str(output_folder),
             "-cmev",
             "-d",
-            str(file_type)
+            str(file_type),
         ]
     )
 
