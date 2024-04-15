@@ -85,7 +85,7 @@ def main(args=None):
                     cache=not args.no_cache,
                 )
                 try:
-                    asyncio.run(enadownloader.download_all_files(args.download_files))
+                    asyncio.run(enadownloader.download_all_files(args.download_type))
                 except enadownloader.NoSuccessfulDownloads as err:
                     logging.error(f"{err} for project {project}")
                     exit(1)
