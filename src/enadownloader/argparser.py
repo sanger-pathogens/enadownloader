@@ -72,7 +72,7 @@ class Parser:
             "--download-type",
             choices=["fastq", "submitted"],
             default="fastq",
-            help="Specify whether to download fastq or submitted files for the given ENA accession"
+            help="Specify whether to download fastq or submitted files for the given ENA accession",
         )
         optional.add_argument(
             "-e",
