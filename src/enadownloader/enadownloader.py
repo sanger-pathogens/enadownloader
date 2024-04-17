@@ -54,7 +54,6 @@ class ENADownloader:
         return parsed_metadata
 
     def flatten_multivalued_ftp_attrs(self, row, file_type) -> list[dict[str, str]]:
-
         if f"{file_type}_ftp" in row and not row[f"{file_type}_ftp"].strip():
             raise self.InvalidRow("No FTP URL was found")
 

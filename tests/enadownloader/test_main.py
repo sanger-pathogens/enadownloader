@@ -9,7 +9,7 @@ def test_main_with_run_accession(tmp_path):
         tmp_path,
         accessions=["SRR9984183"],
         accession_type="run",
-        file_type="fastq",
+        download_type="fastq",
         expected={
             "PRJNA560329": [
                 ".progress.csv",
@@ -25,7 +25,7 @@ def test_main_with_sample_accessions(tmp_path):
         tmp_path,
         accessions=["SAMD00001129", "DRS007307"],
         accession_type="sample",
-        file_type="fastq",
+        download_type="fastq",
         expected={
             "PRJDB1817": [
                 ".progress.csv",
@@ -46,7 +46,7 @@ def test_main_with_study_accessions(tmp_path):
         tmp_path,
         accessions=["PRJDB13556", "DRP008715"],
         accession_type="study",
-        file_type="fastq",
+        download_type="fastq",
         expected={
             "PRJDB13556": [
                 ".progress.csv",
@@ -66,7 +66,7 @@ def test_main_with_study_accessions(tmp_path):
     )
 
 
-def _test_main(tmp_path, accessions, accession_type, file_type, expected):
+def _test_main(tmp_path, accessions, accession_type, download_type, expected):
     input_file = tmp_path / "input.txt"
     input_file.write_text("\n".join(accessions) + "\n")
 
@@ -82,7 +82,8 @@ def _test_main(tmp_path, accessions, accession_type, file_type, expected):
             str(output_folder),
             "-cmev",
             "-d",
-            str(file_type),
+            "--download-type",
+            str(download_type),
         ]
     )
 
