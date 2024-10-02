@@ -1,6 +1,7 @@
 default:
   tags:
     - autoscale
+  image: gitlab-registry.internal.sanger.ac.uk/isg/gitlab-ci-docker-docker:128456_master
 
 stages:
   - format

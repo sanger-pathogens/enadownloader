@@ -11,18 +11,22 @@ COPY setup.cfg pyproject.toml ./
 COPY src src
 
 # Setting in-tree-build as pip started complaining about a potential new feature
-RUN pip install .
+RUN pip install --no-cache-dir .
 
 FROM compile-image AS test
 
 COPY tests tests
 
-RUN pip install -e ".[test]"
+RUN pip install --no-cache-dir -e ".[test]"
 
 # Loose default for quick testing
 CMD ["pytest", "--cov", "src", "--cov-branch", "--cov-report", "term-missing", "--cov-fail-under", "80"]
 
-FROM python:3.10-alpine AS runner
+FROM python:3.10-slim-bookworm AS runner
+
+RUN apt-get update && apt-get install -y \
+   procps \
+   && rm -rf /var/lib/apt/lists/*
 
 ARG WORK="/opt"
 WORKDIR "$WORK"
