@@ -203,10 +203,17 @@ class ENADownloader:
         # Initialise files with header
         self.write_progress_file()
 
+        # Limit concurrency to ENA 50 rate limit
+        semaphore = asyncio.Semaphore(50)
+
+        async def limited_download(item):
+            async with semaphore:
+                return await asyncio.to_thread(self.download_from_ftp, item)
+
         # Run asyncio.to_thread because urllib.urlopen down in self.wget is not supported by asyncio,
         # nor is there any alternative that is
         download_result = await asyncio.gather(
-            *[asyncio.to_thread(self.download_from_ftp, item) for item in to_dos]
+            *[limited_download(item) for item in to_dos]
         )
 
         # Raise an error if at least one download was attempted, but none were successful.
