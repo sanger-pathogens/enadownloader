@@ -1,4 +1,5 @@
 # enadownloader
+
 A robust tool for downloading fastq.gz and metadata from ENA.
 
 The tool has three main functionalities.
@@ -54,7 +55,7 @@ docker run -it --rm enadownload:latest enadownloader --help
 
 To access a shell inside the image:
 ```bash
-docker run -it --rm enadownload:latest ash
+docker run -it --rm enadownload:latest bash
 ```
 
 ## Testing
@@ -69,10 +70,6 @@ docker build -t enadownload:test --target=test .
 docker run -it --rm enadownload:test pytest --cov src --cov-branch --cov-report term-missing --cov-fail-under 80
 ```
 
-## Distribution
-Gitlab CI automatically builds and pushes the Docker image.
-By default, it will build the image as `<branch>-<commit SHA>`.
-These are development images and should only be used for development and testing.
-After a Merge Request has been approved and merged, create a new `tag` on `master`: https://gitlab.internal.sanger.ac.uk/sanger-pathogens/enadownload/-/tags.
+## Deployment on Sanger HPC (farm)
 
-This will start a new job on the CI building the image as `<tag>-<commit SHA>` which can then be fed into [farm5-etc](https://gitlab.internal.sanger.ac.uk/sanger-pathogens/farm5-etc/-/blob/master/software/current/enadownload.yml#L1) 
+See [here](./docs/gitlab_ci.md)
