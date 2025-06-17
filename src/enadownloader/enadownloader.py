@@ -185,7 +185,7 @@ class ENADownloader:
         return hash_md5.hexdigest()
 
     def download_from_ftp(self, ena: ENAFTPContainer) -> bool:
-        url = "ftp://" + ena.ftp
+        url = "https://" + ena.ftp
         outfile = self.output_dir / basename(ena.ftp)
         success = self.wget(url, outfile)
         if success:
